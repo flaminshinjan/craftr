@@ -2,7 +2,7 @@
 
 import { UserButton, useAuth } from "@clerk/nextjs";
 import clsx from "clsx";
-import { Box, ChevronDown, Cpu, Factory, Folder, Hammer, Menu, Package, Plus, ReceiptText, Settings, Shapes, ShieldCheck, X } from "lucide-react";
+import { Box, ChevronDown, Coins, Cpu, Factory, Folder, Hammer, Menu, Package, Plus, ReceiptText, Settings, Shapes, ShieldCheck, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -61,7 +61,7 @@ export function Avatar() {
   return <UserButton appearance={{ elements: { avatarBox: { width: 40, height: 40 } } }} />;
 }
 
-export type NavKey = "build" | "components" | "design" | "firmware" | "bom" | "manufacturing" | "orders" | "projects" | "settings" | "admin";
+export type NavKey = "build" | "components" | "design" | "firmware" | "bom" | "manufacturing" | "orders" | "projects" | "billing" | "settings" | "admin";
 
 /** The workspace frame: sidebar on the left, page on the right. Project links follow the open project, or the last one you opened. */
 export function Shell({ active, projectId, children, flush }: { active: NavKey; projectId?: string; children: React.ReactNode; flush?: boolean }) {
@@ -92,6 +92,7 @@ export function Shell({ active, projectId, children, flush }: { active: NavKey; 
   const bottom: [NavKey, string, string, typeof Box][] = [
     ["orders", "Orders", "/orders", Package],
     ["projects", "Projects", "/projects", Folder],
+    ["billing", "Billing", "/billing", Coins],
     ["settings", "Settings", "/settings", Settings],
     ...(me?.role === "admin" ? ([["admin", "Admin", "/admin", ShieldCheck]] as [NavKey, string, string, typeof Box][]) : []),
   ];
@@ -113,6 +114,14 @@ export function Shell({ active, projectId, children, flush }: { active: NavKey; 
         <nav className="flex flex-col gap-1">{top.map(item)}</nav>
         <div className="mx-2.5 my-5 border-t border-line" />
         <nav className="flex flex-col gap-1">{bottom.map(item)}</nav>
+        {me && (
+          <Link href="/billing" className="mt-auto flex items-center justify-between rounded-xl border border-line bg-card px-3.5 py-3 text-[13.5px] hover:border-line-2">
+            <span className="flex items-center gap-2 text-ink-2">
+              <Coins className="size-4 text-sun" /> Credits
+            </span>
+            <b className="font-semibold tabular-nums">{me.role === "admin" ? "Unlimited" : me.credits.toLocaleString("en-IN")}</b>
+          </Link>
+        )}
       </aside>
       {open && <button aria-label="Close menu" className="fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setOpen(false)} />}
       <div className="flex min-w-0 flex-1 flex-col">

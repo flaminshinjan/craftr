@@ -14,11 +14,18 @@
     "@craftr/core": "workspace:*",
     "@craftr/db": "workspace:*",
     "@hono/node-server": "^1",
+    "dodopayments": "^2.54.0",
     "drizzle-orm": "^0.45",
     "hono": "^4",
     "nanoid": "^5",
     "openai": "^7",
+    "standardwebhooks": "^1.1.1",
     "zod": "^4"
   },
-  "devDependencies": { "esbuild": "^0.25", "tsx": "^4", "typescript": "^5", "@types/node": "^20" }
+  "devDependencies": {
+    "@types/node": "^20",
+    "esbuild": "^0.25",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
 }

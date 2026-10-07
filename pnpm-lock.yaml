@@ -32,6 +32,9 @@ importers:
       '@hono/node-server':
         specifier: ^1
         version: 1.19.17(hono@4.13.13)
+      dodopayments:
+        specifier: ^2.54.0
+        version: 2.54.0
       drizzle-orm:
         specifier: ^0.45
         version: 0.45.3(@neondatabase/serverless@1.2.0)
@@ -44,6 +47,9 @@ importers:
       openai:
         specifier: ^7
         version: 7.30.0(zod@4.6.5)
+      standardwebhooks:
+        specifier: ^1.1.1
+        version: 1.1.1
       zod:
         specifier: ^4
         version: 4.6.5
@@ -1074,6 +1080,10 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
+  dodopayments@2.54.0:
+    resolution: {integrity: sha512-qszw1oaXxk4lyvj5XT/Mhpe6UPBhzjTZDzM86nuSRGZVrwltFncW6VhVNmO44q8m59Eb/8qS7inCQk36fc5xnA==}
+    hasBin: true
+
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
@@ -2074,6 +2084,10 @@ snapshots:
   dequal@2.0.3: {}
 
   detect-libc@2.1.2: {}
+
+  dodopayments@2.54.0:
+    dependencies:
+      standardwebhooks: 1.1.1
 
   dotenv@16.6.1: {}
 

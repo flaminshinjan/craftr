@@ -25,6 +25,9 @@ export const env = {
   anthropicKey: process.env.ANTHROPIC_API_KEY || undefined,
   openaiKey: process.env.OPENAI_API_KEY || undefined,
   imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
+  dodoKey: process.env.DODO_PAYMENTS_API_KEY || undefined,
+  dodoWebhookKey: process.env.DODO_PAYMENTS_WEBHOOK_KEY || undefined,
+  dodoMode: (process.env.DODO_PAYMENTS_ENVIRONMENT === "live_mode" ? "live_mode" : "test_mode") as "live_mode" | "test_mode",
   adminEmails: (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
   webOrigins: (process.env.WEB_ORIGIN ?? "http://localhost:3737").split(",").map((s) => s.trim().replace(/\/$/, "")),
   /** Local scripted testing only: trust an x-dev-user header. Never honoured in production. */

@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { designByKeywords, designProduct, editProduct, hasClaude, writeFirmware } from "../ai/claude";
 import { decodeReference, hasImages, renderPreview } from "../ai/images";
 import { requireUser, type AppEnv } from "../auth";
+import { charge } from "../billing";
 import { DEFAULT_PLAN, DONE, bad, build, cleanNodes, ensurePower, fromDesign, ownProject, type Project } from "../lib";
 
 export const projectRoutes = new Hono<AppEnv>().use(requireUser);
@@ -74,6 +75,15 @@ projectRoutes.post("/:id/generate", async (c) => {
   if (p.gen.step === 0 || p.gen.step >= 6) return c.json({ ok: true, skipped: "done" });
   if (p.gen.startedAt && !stale && !p.gen.error) return c.json({ ok: true, skipped: "running" });
 
+  // Charged once per build; a retry after a failure was already refunded, so it is charged again.
+  let refund = async () => {};
+  try {
+    if (hasClaude()) refund = await charge(c.get("user"), "generate", p.id);
+  } catch (e) {
+    // Out of credits: show it on the build page instead of spinning forever.
+    await setGen(p.id, { ...p.gen, startedAt: null, error: errText(e) });
+    return c.json({ ok: false, error: errText(e) }, 402);
+  }
   let gen: GenState = { step: 1, error: null, startedAt: new Date().toISOString(), plan: p.gen.plan };
   await setGen(p.id, gen);
   try {
@@ -103,6 +113,7 @@ projectRoutes.post("/:id/generate", async (c) => {
     return c.json({ ok: true });
   } catch (e) {
     console.error("generation failed", e);
+    await refund();
     await setGen(p.id, { ...gen, error: errText(e) });
     return c.json({ ok: false, error: errText(e) }, 500);
   }
@@ -165,6 +176,7 @@ projectRoutes.post("/:id/chat", async (c) => {
   if (!text) bad("Say what you'd like to change.");
   if (!hasClaude()) bad("Chat needs ANTHROPIC_API_KEY on the api. You can still edit the design by hand.", 422);
 
+  c.set("refund", await charge(c.get("user"), "chat", p.id));
   const history = await db().select().from(messages).where(eq(messages.projectId, p.id)).orderBy(asc(messages.createdAt));
   await say(p.id, "user", text);
   const edit = await editProduct(p, history, text);
@@ -211,6 +223,7 @@ projectRoutes.post("/:id/firmware", async (c) => {
   if (language !== "micropython" && language !== "arduino") bad("Unknown language.");
   if (!p.nodes.length) bad("Add some blocks first.");
   let firmware;
+  if (hasClaude()) c.set("refund", await charge(c.get("user"), "firmware", p.id));
   if (hasClaude()) firmware = await writeFirmware({ ...p, language });
   else if (language === "micropython") firmware = composeFirmware(p);
   else firmware = bad("Arduino C++ is written by Claude and needs ANTHROPIC_API_KEY on the api.", 422);
@@ -223,6 +236,8 @@ projectRoutes.post("/:id/preview", async (c) => {
   if (!hasImages()) bad("Renders need OPENAI_API_KEY on the api.", 422);
   if (!p.nodes.length) bad("Add some blocks first.");
   const body = await c.req.json<{ reference?: string }>().catch(() => ({}) as { reference?: string });
+  // A build's first picture is part of the build; re-renders are charged.
+  if (p.previewAssetId) c.set("refund", await charge(c.get("user"), "render", p.id));
   const previewAssetId = await renderPreview(p.id, p, "preview", decodeReference(body.reference));
   // An untouched remix of a proven build: keep this render for everyone who remixes it next.
   const t = p.origin === "template" && p.version === 1 ? TEMPLATES.find((x) => x.prompt === p.prompt) : undefined;
@@ -236,6 +251,7 @@ projectRoutes.post("/:id/variants", async (c) => {
   const p = await ownProject(c.get("user"), c.req.param("id"));
   if (!hasImages()) bad("Variants need OPENAI_API_KEY on the api.", 422);
   const reference = decodeReference((await c.req.json<{ reference?: string }>().catch(() => ({}) as { reference?: string })).reference);
+  c.set("refund", await charge(c.get("user"), "variants", p.id));
   const styles = Object.keys(STYLE) as DesignConfig["style"][];
   // With a reference picture the shape is fixed, so variants explore colour; without one they can vary style too.
   const options = (reference ? [p.design.style] : styles).flatMap((style) => COLORS.map((color) => ({ style, color }))).filter((o) => o.style !== p.design.style || o.color !== p.design.color);

@@ -7,6 +7,8 @@ export interface Me {
   imageUrl: string | null;
   role: "user" | "admin";
   savedAddress: Address | null;
+  credits: number;
+  plan: "free" | "maker" | "studio";
 }
 
 export interface Message {

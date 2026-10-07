@@ -11,6 +11,12 @@ export const users = pgTable("users", {
   imageUrl: text("image_url"),
   role: text("role").$type<"user" | "admin">().notNull().default("user"),
   savedAddress: jsonb("saved_address").$type<ShippingAddress | null>(),
+  /** Credit balance. New accounts start with the sign-up grant. */
+  credits: integer("credits").notNull().default(150),
+  plan: text("plan").$type<"free" | "maker" | "studio">().notNull().default("free"),
+  planRenewsAt: timestamp("plan_renews_at", { withTimezone: true }),
+  dodoCustomerId: text("dodo_customer_id"),
+  dodoSubscriptionId: text("dodo_subscription_id"),
   createdAt,
 });
 
@@ -166,3 +172,33 @@ export const orderEvents = pgTable(
   },
   (t) => [index("order_events_order_idx").on(t.orderId, t.createdAt)],
 );
+
+/** Every change to a credit balance, so the balance can always be explained. */
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    balance: integer("balance").notNull(),
+    reason: text("reason").notNull(),
+    ref: text("ref"),
+    createdAt,
+  },
+  (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
+);
+
+/** Dodo product ids for each plan and pack, created once by the billing setup script. */
+export const billingProducts = pgTable("billing_products", {
+  key: text("key").primaryKey(),
+  productId: text("product_id").notNull(),
+  mode: text("mode").notNull(),
+  createdAt,
+});
+
+/** Webhook deliveries already handled, so a retry never grants credits twice. */
+export const webhookEvents = pgTable("webhook_events", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  createdAt,
+});

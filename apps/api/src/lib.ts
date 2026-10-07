@@ -10,7 +10,7 @@ export const IDLE: GenState = { step: 0, error: null, startedAt: null, plan: [] 
 export const DONE: GenState = { step: 6, error: null, startedAt: null, plan: [] };
 export const DEFAULT_PLAN = ["Choose sensors, MCU, power, and connectivity modules", "Create a compact enclosure around the parts", "Read sensors, connect, and drive outputs", "Estimate prototype cost and source parts", "Finalize design files and manufacturing plan"];
 
-export const bad = (message: string, status: 400 | 404 | 409 | 422 = 400): never => {
+export const bad = (message: string, status: 400 | 402 | 404 | 409 | 422 = 400): never => {
   throw new HTTPException(status, { message });
 };
 

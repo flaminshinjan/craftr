@@ -27,7 +27,7 @@ export function useProject(id: string) {
     kicked.current = key;
     api(`/projects/${p.id}/generate`, { method: "POST" })
       .catch(() => {})
-      .finally(() => qc.invalidateQueries({ queryKey: ["project", id] }));
+      .finally(() => (qc.invalidateQueries({ queryKey: ["project", id] }), qc.invalidateQueries({ queryKey: ["me"] })));
   }, [p, stalled, api, qc, id]);
 
   return { ...q, project: q.data, generating: generating(q.data), notFound: q.error instanceof ApiError && q.error.status === 404 };
@@ -49,6 +49,8 @@ export function useProjectAction<B extends object | void = void>(id: string, pat
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: B) => api<Project>(`/projects/${id}/${path}`, { method: "POST", body: body ?? {} }),
+    // These actions spend credits, so the balance in the sidebar is refreshed either way.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["me"] }),
     onSuccess: (row) => qc.setQueryData<Project>(["project", id], (old) => (old ? { ...old, ...row } : row)),
   });
 }

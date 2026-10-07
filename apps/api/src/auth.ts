@@ -6,7 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import { env } from "./env";
 
 export type User = typeof users.$inferSelect;
-export type AppEnv = { Variables: { user: User } };
+export type AppEnv = { Variables: { user: User; refund?: () => Promise<void> } };
 
 async function upsert(id: string, load: () => Promise<{ email: string; name: string; imageUrl: string | null }>): Promise<User> {
   const [existing] = await db().select().from(users).where(eq(users.id, id));

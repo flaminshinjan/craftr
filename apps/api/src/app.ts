@@ -6,9 +6,11 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { hasClaude } from "./ai/claude";
 import { hasImages } from "./ai/images";
+import { hasBilling } from "./billing";
 import { requireUser, type AppEnv } from "./auth";
 import { env } from "./env";
 import { adminRoutes } from "./routes/admin";
+import { billingRoutes } from "./routes/billing";
 import { orderRoutes } from "./routes/orders";
 import { projectRoutes } from "./routes/projects";
 
@@ -23,14 +25,16 @@ app.use(
   }),
 );
 
-app.onError((err, c) => {
+app.onError(async (err, c) => {
+  // An AI action that failed after being charged gets its credits back.
+  await c.get("refund")?.().catch((e) => console.error("refund failed", e));
   if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
   console.error(err);
   return c.json({ error: err instanceof Error ? err.message : "Something went wrong." }, 500);
 });
 
 app.get("/", (c) => c.json({ name: "craftr-api", ok: true }));
-app.get("/health", (c) => c.json({ ok: true, db: !!process.env.DATABASE_URL, auth: !!env.clerkSecret, chat: hasClaude(), images: hasImages() }));
+app.get("/health", (c) => c.json({ ok: true, db: !!process.env.DATABASE_URL, auth: !!env.clerkSecret, chat: hasClaude(), images: hasImages(), billing: hasBilling() }));
 
 app.get("/assets/:id", async (c) => {
   const [a] = await db().select().from(assets).where(eq(assets.id, c.req.param("id")));
@@ -62,3 +66,4 @@ app.get("/me", requireUser, (c) => c.json(c.get("user")));
 app.route("/projects", projectRoutes);
 app.route("/orders", orderRoutes);
 app.route("/admin", adminRoutes);
+app.route("/billing", billingRoutes);
