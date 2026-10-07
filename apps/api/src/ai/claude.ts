@@ -34,7 +34,7 @@ const DesignSchema = z.object({
   reply: z.string(),
   blocks: z.array(z.object({ block_id: z.string(), reason: z.string() })),
   spec: SpecSchema,
-  enclosure: z.object({ shape: z.enum(["box", "round"]), style: z.enum(["minimal", "rugged", "compact"]), color: z.string(), material: z.enum(["PLA", "ABS", "PETG", "PC"]) }),
+  enclosure: z.object({ shape: z.enum(["box", "round", "card"]), pocket_cards: z.number(), style: z.enum(["minimal", "rugged", "compact"]), color: z.string(), material: z.enum(["PLA", "ABS", "PETG", "PC"]) }),
   features: z.array(z.object({ icon: z.enum(ICONS), label: z.string() })),
   plan: z.object({ components: z.string(), enclosure: z.string(), firmware: z.string(), bom: z.string(), manufacturing: z.string() }),
 });
@@ -55,6 +55,8 @@ Engineering rules that Craftr's validator enforces after you answer, so follow t
 - Only one I2S microphone, one I2S speaker, one serial device and one SPI display per device. Never two blocks with the same I2C address.
 - Small controllers have few pins; do not overload them.
 - Pick the smallest battery that meets the stated battery life, and say what the tradeoff is.
+- To charge a phone the device needs magsafe_charger, powerbank_module and a large battery (lipo_3000). magsafe_charger already contains the magnet ring, so never add magsafe_ring beside it, and powerbank_module replaces charger_tp4056.
+- The enclosure generator can make exactly this and nothing else: a box, a round puck or a phone-back card; openings for the chosen parts; and, on the card shape, an outside card pocket. Never promise a strap, clip, hinge, stand, lens, cable channel or any other feature in the description, reply or plan. If the idea needs one, say it is not available yet.
 - Add only what the idea needs. Fewer blocks means a cheaper, smaller device that is more likely to work first time.`;
 
 async function parse<T extends z.ZodType>(schema: T, system: string, user: string, effort: "low" | "medium"): Promise<z.infer<T>> {
@@ -80,7 +82,7 @@ export function designProduct(prompt: string): Promise<ProductDesign> {
 - reply: one friendly sentence confirming what you are about to build, plus any assumption you had to make. Shown in the chat.
 - blocks: the catalogue blocks to use, each with a one-line reason.
 - spec: the structured product spec. battery_target_hours is the battery life the user wants in hours, or null when it runs from USB. duty is how the device behaves: always_on, periodic (wakes every few minutes, sleeps in between) or event_driven (sleeps until a button or motion).
-- enclosure: shape (round for pucks, MagSafe devices, dials and anything worn or held like a coin; box otherwise), style, a hex colour that suits the product, and a print material.
+- enclosure: shape, pocket_cards, style, a hex colour that suits the product, and a print material. Shape is "card" for anything that lies flat on the back of a phone or is carried like a wallet (wallets, battery packs, card holders): a 66 × 102 mm slab as thin as the parts allow. Shape is "round" for pucks, dials and coin-like things. Otherwise "box". pocket_cards is how many bank cards an outside pocket should hold (1 to 3) and is only possible on the card shape; use 0 when there is no pocket.
 - features: three to five short chips for the summary card.
 - plan: one short line per step describing what Craftr will do for this specific product.`,
     "medium",
@@ -95,7 +97,8 @@ const EditSchema = z.object({
   name: z.string().nullable(),
   description: z.string().nullable(),
   design: z.object({
-    shape: z.enum(["box", "round"]).nullable(),
+    shape: z.enum(["box", "round", "card"]).nullable(),
+    pocket_cards: z.number().nullable(),
     style: z.enum(["minimal", "rugged", "compact"]).nullable(),
     material: z.enum(["PLA", "ABS", "PETG", "PC"]).nullable(),
     color: z.string().nullable(),
@@ -143,7 +146,7 @@ export function editProduct(project: ProjectContext, history: { role: "user" | "
 - changes: a short list of the concrete changes, for example "Swapped the 1000 mAh battery for 2000 mAh". Empty when nothing changed.
 - add_blocks / remove_blocks: catalogue ids. To swap a part, remove the old id and add the new one.
 - name, description: new values, or null to keep them.
-- design: only the fields to change, null for the rest. Shape is box or round (a round puck's diameter is its width). Width, height and depth are outer millimetres; set them only when the customer asks for a size, and never below the smallest possible size.
+- design: only the fields to change, null for the rest. Shape is box, round (a puck whose diameter is its width) or card (a 66 × 102 mm phone-back slab, which is the only shape that can carry pocket_cards). Width, height and depth are outer millimetres; set them only when the customer asks for a size, and never below the smallest possible size.
 - spec: only the fields to change, null for the rest.
 - rewrite_firmware: true when the device should behave differently, not merely when parts change (Craftr rewires and regenerates driver code on its own).`,
     "low",
@@ -252,7 +255,7 @@ export function designByKeywords(prompt: string): ProductDesign {
       enclosure_style: small ? "compact" : "minimal",
       manufacturing_method: "FDM 3D printing",
     },
-    enclosure: { shape: has("magsafe", "puck", "round") ? "round" : "box", style: small ? "compact" : "minimal", color: "#F2EBDD", material: "PETG" },
+    enclosure: { shape: has("wallet", "power bank", "powerbank", "card holder") ? "card" : has("magsafe", "puck", "round") ? "round" : "box", pocket_cards: has("wallet", "card holder") ? 2 : 0, style: small ? "compact" : "minimal", color: "#F2EBDD", material: "PETG" },
     features: [],
     plan: { components: "Choose sensors, MCU, power, and connectivity modules", enclosure: "Create a compact enclosure around the parts", firmware: "Read sensors and drive outputs", bom: "Estimate prototype cost and source parts", manufacturing: "Finalize design files and manufacturing plan" },
   };

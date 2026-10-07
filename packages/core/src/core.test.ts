@@ -39,6 +39,12 @@ for (const t of TEMPLATES) {
     // No two parts in the same layer overlap.
     const inside = c.layout.placements.filter((p) => p.layer !== "external");
     for (const a of inside) for (const b of inside) if (a !== b && a.layer === b.layer) assert.ok(Math.abs(a.pos[0] - b.pos[0]) >= (a.size[0] + b.size[0]) / 2 - 1e-6 || Math.abs(a.pos[1] - b.pos[1]) >= (a.size[1] + b.size[1]) / 2 - 1e-6, `${a.blockId} overlaps ${b.blockId}`);
+    if (t.design.shape === "card") {
+      assert.ok(c.layout.pocket, "card shape with pocketCards should get a pocket");
+      // Nothing front-mounted may sit under the pocket.
+      const bottom = c.layout.pocket.y - c.layout.pocket.h / 2;
+      for (const p of c.layout.placements.filter((p) => p.layer === "front")) assert.ok(p.pos[1] + p.size[1] / 2 <= bottom + 1e-6, `${p.blockId} is under the card pocket`);
+    }
     const fw = composeFirmware(t);
     assert.ok(fw.files[0].content.includes("while True:"));
     assert.ok(!/\{[A-Z]+\}/.test(fw.files[0].content), "unfilled pin placeholder");

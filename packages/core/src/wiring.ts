@@ -172,6 +172,7 @@ export function wire(nodes: ProjectNode[]): Wiring {
   const regulator = find("regulator");
   const sw = find("power_switch");
   const solar = find("solar");
+  const pad = find("wireless_charging");
   const usb = parts.find((p) => p.block.id === "usb_c");
   const power = (a: Resolved, b: Resolved, label: string, pins: { a: string; b: string }[]) =>
     edges.push({ id: `${a.node.id}-${b.node.id}`, from: a.node.id, to: b.node.id, kind: "power", color: KIND_COLOR.power, label, pins });
@@ -195,6 +196,7 @@ export function wire(nodes: ProjectNode[]): Wiring {
       }
       if (usb) power(usb, charger, "5V", [{ a: "VBUS", b: "IN+" }, { a: "GND", b: "GND" }]);
       if (solar) power(solar, charger, "Solar", [{ a: "V+", b: "IN+" }, { a: "V-", b: "GND" }]);
+      if (pad && charger.block.tags.includes("boost_5v")) power(charger, pad, "5V to phone charger", [{ a: "5V", b: "5V" }, { a: "GND", b: "GND" }]);
     } else if (onboard) {
       power(battery, mcu, "Battery", [{ a: "BAT+", b: "BAT+" }, { a: "BAT-", b: "BAT-" }]);
     } else {
@@ -205,6 +207,7 @@ export function wire(nodes: ProjectNode[]): Wiring {
     if (usb) power(usb, mcu, "5V", [{ a: "VBUS", b: "5V" }, { a: "GND", b: "GND" }]);
     if (charger) checks.push({ id: "charger", level: "warn", title: "Charger without a battery", detail: "There is a charger but no battery. Add a battery or remove the charger." });
   }
+  if (pad && !(battery && charger?.block.tags.includes("boost_5v"))) checks.push({ id: "phone-charging", level: "error", title: "Phone charger has no power source", detail: "The MagSafe Charging Pad needs a battery and the Power Bank Module, which supplies the 5V it runs on." });
   if (solar && !charger) checks.push({ id: "solar", level: "error", title: "Solar panel has nowhere to go", detail: "The panel needs a battery and the Battery Charger block to store its energy." });
 
   return { edges, pinmap, checks, mcu };

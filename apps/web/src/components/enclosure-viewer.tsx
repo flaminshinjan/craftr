@@ -108,6 +108,26 @@ function buildShell(l: Layout, mat: THREE.Material) {
     lid = ev.evaluate(lid, lip, ADDITION);
     for (const c of cuts) lid = ev.evaluate(lid, c, SUBTRACTION);
   }
+  // The card pocket: a shallow sleeve on the outside of the front cover, open at the top, with a thumb notch.
+  if (l.pocket) {
+    const k = l.pocket;
+    const place = (g: THREE.BufferGeometry, x: number, y: number, z: number) => {
+      const b = new Brush(g, mat);
+      b.position.set(x, y, z);
+      b.updateMatrixWorld();
+      return b;
+    };
+    const sleeve = place(new RoundedBoxGeometry(k.w, k.h, k.d + 1, 4, 1.6), 0, k.y, d / 2 + k.d / 2 - 0.5);
+    const slot = place(new THREE.BoxGeometry(k.w - 3.2, k.h, k.slot), 0, k.y + 1.6, d / 2 + k.slot / 2 + 0.6);
+    const notch = new Brush(new THREE.CylinderGeometry(9, 9, k.d + 4, 40), mat);
+    notch.rotation.x = Math.PI / 2;
+    notch.position.set(0, k.y + k.h / 2, d / 2 + k.d / 2 + 1.2);
+    notch.updateMatrixWorld();
+    lid = ev.evaluate(lid, sleeve, ADDITION);
+    lid = ev.evaluate(lid, slot, SUBTRACTION);
+    lid = ev.evaluate(lid, notch, SUBTRACTION);
+    for (const b of [sleeve, slot, notch]) b.geometry.dispose();
+  }
   for (const b of [outer, cavity, slab, ...cuts]) b.geometry.dispose();
   return { body: body.geometry, lid: lid.geometry };
 }
@@ -363,7 +383,7 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
   }, [interactive, spin]);
 
   // Rebuild the model whenever the design changes.
-  const sig = JSON.stringify([layout.shape, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color]);
+  const sig = JSON.stringify([layout.shape, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color]);
   useEffect(() => {
     const s = stage.current;
     if (!s) return;
@@ -408,6 +428,18 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
       add(part, step * order[p.layer]);
     }
 
+    // Two cards in the pocket, so it reads as a wallet. They are props, not part of the print.
+    if (layout.pocket) {
+      const k = layout.pocket;
+      const cards = new THREE.Group();
+      ["#d9dde3", "#2e5fa8", "#c9a24a"].slice(0, k.cards).forEach((tint, i) => {
+        const cardMesh = new THREE.Mesh(new RoundedBoxGeometry(54, 85.6, 0.76, 2, 0.3), std(tint, 0.45, 0.1));
+        cardMesh.position.set(0, k.y - k.h / 2 + 1.6 + 85.6 / 2 + i * 3, d / 2 + 0.6 + 0.4 + i * 0.8);
+        cards.add(cardMesh);
+      });
+      add(cards, step * 6.4);
+    }
+
     const low = Math.min(-h / 2, ...layout.placements.map((p) => p.pos[1] - p.size[1] / 2));
     const shadow = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(w, d) * 2.4, Math.max(w, d) * 2.4), new THREE.MeshBasicMaterial({ map: contactShadow(), transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
@@ -418,11 +450,13 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
     s.movers = movers;
     s.shell = shellMat;
     s.geos = geos;
-    const radius = Math.hypot(w, h, d) / 2 + Math.max(0, -h / 2 - low) / 2;
+    // Cards stand above the body, so the frame has to make room for them.
+    const high = layout.pocket ? layout.pocket.y - layout.pocket.h / 2 + 1.6 + 85.6 + 6 : h / 2;
+    const radius = Math.hypot(w, high - low, d) / 2;
     const dist = (radius / Math.sin((s.camera.fov * Math.PI) / 360)) * 1.12;
     const first = s.dist === 200 && s.camera.position.lengthSq() === 0;
     s.dist = dist;
-    s.controls.target.set(0, (low + h / 2) / 2, s.controls.target.z);
+    s.controls.target.set(0, (low + high) / 2, s.controls.target.z);
     s.controls.minDistance = dist * 0.5;
     s.controls.maxDistance = dist * 3.5;
     if (first) s.camera.position.set(0.72, 0.5, 1).normalize().multiplyScalar(dist * (s.mode === "exploded" ? 1.75 : 1));

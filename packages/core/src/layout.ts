@@ -1,5 +1,5 @@
 import { resolveNodes } from "./wiring";
-import type { BlockDef, DesignConfig, EnclosureStyle, Layout, Material, PlacedCutout, Placement, ProjectNode } from "./types";
+import type { BlockDef, CardPocket, DesignConfig, EnclosureStyle, Layout, Material, PlacedCutout, Placement, ProjectNode } from "./types";
 
 export const STYLE: Record<EnclosureStyle, { wall: number; radius: number; clearance: number; label: string; blurb: string }> = {
   minimal: { wall: 2, radius: 8, clearance: 1.2, label: "Minimal", blurb: "Soft corners, clean faces" },
@@ -16,6 +16,9 @@ export const MATERIAL: Record<Material, { density: number; inrPerG: number; blur
 
 export const COLORS = ["#F2EBDD", "#5FA052", "#D9B98E", "#C9C9C6", "#3F4043"];
 export const MIN_WALL = 1.2;
+/** Footprint of the card shape: it has to cover a bank card and sit inside a phone's back. */
+export const CARD = { w: 66, h: 102 };
+const BANK_CARD = { w: 54, h: 85.6, t: 0.8 };
 const GAP = 2;
 const LAYER_GAP = 1.5;
 
@@ -123,6 +126,8 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   const style = STYLE[design.style] ?? STYLE.minimal;
   const { wall, clearance } = style;
   const shape = design.shape === "round" ? "round" : "box";
+  const card = design.shape === "card";
+  let pocket: CardPocket | null = null;
   const parts = resolveNodes(nodes);
   const item = (p: (typeof parts)[number]): Item => ({ nodeId: p.node.id, block: p.block, w: p.block.size.w, d: p.block.size.d, t: p.block.size.h });
   const by = (f: (b: BlockDef) => boolean) => parts.filter((p) => f(p.block)).map(item);
@@ -162,8 +167,19 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     for (const k of ORDER) if (groups[k].length) placedLayers[k] = packCircle(groups[k], room) ?? packCircle(groups[k], minRadius(groups[k]))!;
   } else {
     // With a size the user chose, lay rows out to the width they gave, so a wide box gets wide rows.
-    const roomW = design.auto ? undefined : design.width - pad;
-    const roomH = design.height - pad;
+    const roomW = card ? CARD.w - pad : design.auto ? undefined : design.width - pad;
+    const roomH = card ? CARD.h - pad : design.height - pad;
+    // On a card, the small boards tuck in around the charging pad or magnet ring, leaving one thin layer for the battery.
+    if (card && groups.back.length) {
+      const isCell = (i: Item) => i.block.tags.includes("battery");
+      const small = [...groups.logic, ...groups.power.filter((i) => !isCell(i))];
+      const together = pack([...groups.back, ...small], roomW);
+      if (small.length && together.w <= roomW! && together.h <= roomH) {
+        groups.back = [...groups.back, ...small];
+        groups.logic = [];
+        groups.power = groups.power.filter(isCell);
+      }
+    }
     const fit = (items: Item[]) => {
       const natural = pack(items);
       if (roomW === undefined) return natural;
@@ -182,14 +198,21 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     const live = ORDER.filter((k) => groups[k].length);
     const innerW = Math.max(16, ...live.map((k) => packed[k].w));
     const innerH = Math.max(16, ...live.map((k) => packed[k].h));
-    minOuter = { w: ceil(innerW + pad), h: ceil(innerH + pad), d: ceil(depthOf() + pad) };
-    outer = design.auto ? { ...minOuter } : { w: design.width, h: design.height, d: design.depth };
+    minOuter = { w: Math.max(ceil(innerW + pad), card ? CARD.w : 0), h: Math.max(ceil(innerH + pad), card ? CARD.h : 0), d: ceil(depthOf() + pad) };
+    // A card keeps its footprint and is always as thin as the parts allow.
+    outer = design.auto || card ? { ...minOuter } : { w: design.width, h: design.height, d: design.depth };
     fits = outer.w >= minOuter.w && outer.h >= minOuter.h && outer.d >= minOuter.d;
     const halfW = outer.w / 2 - wall;
+    // The card pocket covers the top of the front face, so anything front-mounted moves to a strip along the bottom.
+    const cards = card ? Math.max(0, Math.min(3, Math.round(design.pocketCards ?? 0))) : 0;
+    const strip = packed.front.items.length ? packed.front.h + 2 * clearance + 3 : 0;
+    const pocketH = Math.min(BANK_CARD.h - 14, outer.h - strip - 6);
+    if (cards && pocketH >= 45) pocket = { w: Math.min(outer.w - 4, BANK_CARD.w + 5), h: pocketH, y: outer.h / 2 - 3 - pocketH / 2, d: cards * BANK_CARD.t + 2.3, slot: cards * BANK_CARD.t + 0.7, cards };
+    const frontDrop = pocket ? -(outer.h / 2 - wall - clearance) + packed.front.h / 2 : 0;
     for (const k of live) {
       const L = packed[k];
       const xo = L.hasPort ? halfW - clearance - L.w / 2 : 0;
-      placedLayers[k] = L.items.map((it) => ({ ...it, x: it.x + xo }));
+      placedLayers[k] = L.items.map((it) => ({ ...it, x: it.x + xo, y: it.y + (k === "front" ? frontDrop : 0) }));
     }
   }
 
@@ -232,7 +255,7 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   const massG = Math.round(shellVolumeCm3 * density * 0.85 + parts.reduce((s, p) => s + p.block.massG, 0));
   const limit = Math.min(outer.w, outer.h, outer.d) / 2 - 0.5;
 
-  return { shape, outer, minOuter, wall, radius: Math.min(shape === "round" ? Math.min(style.radius, 4) : style.radius, limit), clearance, placements, cutouts, fits, shellVolumeCm3, massG };
+  return { shape, card, pocket, outer, minOuter, wall, radius: Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : style.radius, limit), clearance, placements, cutouts, fits, shellVolumeCm3, massG };
 }
 
 export function enclosureCostInr(l: Layout, material: Material): number {

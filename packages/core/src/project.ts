@@ -87,6 +87,16 @@ export const TEMPLATES: Template[] = [
     spec: { use_case: "Capture voice notes with one press and sync them to a phone", power_source: "battery", battery_target: "1 week of normal use", battery_target_hours: 72, duty: "event_driven", connectivity: ["Bluetooth LE", "Wi-Fi"], inputs: ["Button", "Microphone"], outputs: ["Status LED"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
   }),
   tpl({
+    id: "magsafe-wallet-power-bank",
+    name: "MagSafe Wallet Power Bank",
+    tagline: "Carries your cards and tops up your phone.",
+    prompt: "I want a MagSafe wallet plus power bank for my iPhone.",
+    description: "A slab that snaps to the back of your iPhone, holds two cards in a front pocket and wirelessly tops up the phone from its own battery. Recharges over USB-C.",
+    blocks: ["esp32_c3_supermini", "magsafe_charger", "powerbank_module", "lipo_3000", "led"],
+    design: { shape: "card", pocketCards: 2, style: "compact", color: "#3F4043", material: "PETG" },
+    spec: { use_case: "Carry cards and wirelessly top up an iPhone", power_source: "battery", battery_target: "", battery_target_hours: null, duty: "event_driven", connectivity: ["Bluetooth LE"], inputs: [], outputs: ["Status LED", "Wireless phone charging"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
+  }),
+  tpl({
     id: "smart-plant-monitor",
     name: "Smart Plant Monitor",
     tagline: "Tells you when your plant needs water.",

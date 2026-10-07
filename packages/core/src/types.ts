@@ -104,11 +104,14 @@ export interface ProjectNode {
 export type EnclosureStyle = "minimal" | "rugged" | "compact";
 export type Material = "PLA" | "ABS" | "PETG" | "PC";
 
-export type EnclosureShape = "box" | "round";
+/** box: rounded box. round: puck. card: a flat slab the size of a phone's back, for wallets and battery packs. */
+export type EnclosureShape = "box" | "round" | "card";
 
 export interface DesignConfig {
   /** Rounded box, or a round puck whose diameter is `width`. */
   shape?: EnclosureShape;
+  /** Cards the outside pocket should hold (0 for no pocket). Only on the card shape. */
+  pocketCards?: number;
   style: EnclosureStyle;
   material: Material;
   color: string;
@@ -164,8 +167,22 @@ export interface PlacedCutout {
   v: number;
 }
 
+export interface CardPocket {
+  /** Outside size of the pocket on the front face, and the height of its centre above the enclosure centre. */
+  w: number;
+  h: number;
+  y: number;
+  /** How far it stands off the front face, and the depth of the slot inside it. */
+  d: number;
+  slot: number;
+  cards: number;
+}
+
 export interface Layout {
-  shape: EnclosureShape;
+  /** The shell the viewer builds: a card is a box with a fixed footprint. */
+  shape: "box" | "round";
+  card: boolean;
+  pocket: CardPocket | null;
   outer: { w: number; h: number; d: number };
   minOuter: { w: number; h: number; d: number };
   wall: number;

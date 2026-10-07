@@ -121,7 +121,9 @@ projectRoutes.post("/:id/generate", async (c) => {
 
 function patchDesign(cur: DesignConfig, patch: Partial<Record<keyof DesignConfig, unknown>>): DesignConfig {
   const d = { ...cur };
-  if (patch.shape === "box" || patch.shape === "round") d.shape = patch.shape;
+  if (patch.shape === "box" || patch.shape === "round" || patch.shape === "card") d.shape = patch.shape;
+  const cards = Number((patch as { pocketCards?: unknown; pocket_cards?: unknown }).pocketCards ?? (patch as { pocket_cards?: unknown }).pocket_cards);
+  if (Number.isFinite(cards)) d.pocketCards = Math.max(0, Math.min(3, Math.round(cards)));
   if (typeof patch.style === "string" && patch.style in STYLE) d.style = patch.style as DesignConfig["style"];
   if (typeof patch.material === "string" && patch.material in MATERIAL) d.material = patch.material as DesignConfig["material"];
   if (typeof patch.color === "string" && /^#[0-9a-fA-F]{6}$/.test(patch.color)) d.color = patch.color;

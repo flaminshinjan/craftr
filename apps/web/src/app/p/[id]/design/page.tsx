@@ -2,7 +2,7 @@
 
 import { COLORS, MATERIAL, STYLE, compile, type DesignConfig, type EnclosureStyle, type Material } from "@craftr/core";
 import clsx from "clsx";
-import { ArrowRight, Box, Circle, Download, Maximize2, Sparkles } from "lucide-react";
+import { ArrowRight, Box, Circle, Download, Maximize2, RectangleVertical, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -101,14 +101,29 @@ function Design({ p }: { p: Project }) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[400px_minmax(0,1fr)_auto]">
         <div className="flex flex-col gap-7">
           <Group label="Shape">
-            <div className="grid grid-cols-2 gap-3">
-              {(["box", "round"] as const).map((sh) => (
-                <Option key={sh} active={(design.shape ?? "box") === sh} onClick={() => set({ shape: sh })} title={sh === "box" ? "A rounded box" : "A round puck"}>
-                  {sh === "box" ? <Box className={clsx("size-8", (design.shape ?? "box") === sh ? "text-[#4d79d8]" : "text-ink-3")} strokeWidth={1.4} /> : <Circle className={clsx("size-8", design.shape === sh ? "text-[#4d79d8]" : "text-ink-3")} strokeWidth={1.4} />}
-                  {sh === "box" ? "Box" : "Round"}
-                </Option>
-              ))}
+            <div className="grid grid-cols-3 gap-3">
+              {([["box", "Box", "A rounded box"], ["round", "Round", "A round puck"], ["card", "Card", "A flat slab for the back of a phone"]] as const).map(([sh, label, hint]) => {
+                const on = (design.shape ?? "box") === sh;
+                const I = sh === "box" ? Box : sh === "round" ? Circle : RectangleVertical;
+                return (
+                  <Option key={sh} active={on} onClick={() => set({ shape: sh, auto: true })} title={hint}>
+                    <I className={clsx("size-8", on ? "text-[#4d79d8]" : "text-ink-3")} strokeWidth={1.4} />
+                    {label}
+                  </Option>
+                );
+              })}
             </div>
+            {design.shape === "card" && (
+              <label className="mt-3 flex items-center justify-between gap-3 text-[14px] text-ink-2">
+                Card pocket
+                <select value={design.pocketCards ?? 0} onChange={(e) => set({ pocketCards: Number(e.target.value) })} className="h-10 rounded-xl border border-line bg-card px-3">
+                  <option value={0}>None</option>
+                  <option value={1}>1 card</option>
+                  <option value={2}>2 cards</option>
+                  <option value={3}>3 cards</option>
+                </select>
+              </label>
+            )}
           </Group>
           <Group label="Style">
             <div className="grid grid-cols-3 gap-3">
@@ -148,7 +163,7 @@ function Design({ p }: { p: Project }) {
               </button>
             }
           >
-            <div className="flex flex-col gap-4">
+            <div className={clsx("flex flex-col gap-4", layout.card && "hidden")}>
               {dims.map((d) => (
                 <label key={d.k} className="grid grid-cols-[64px_1fr_64px] items-center gap-3">
                   <span className="text-ink-2 capitalize">{round && d.k === "width" ? "Diameter" : d.k}</span>
@@ -165,7 +180,7 @@ function Design({ p }: { p: Project }) {
               ))}
             </div>
             <p className="mt-3 text-[13px] text-ink-3">
-              Sliders stop at the smallest size the parts fit in. {layout.wall} mm walls · about {layout.massG} g assembled.
+              {layout.card ? `A card is ${layout.outer.w} × ${layout.outer.h} mm, and ${layout.outer.d} mm thick with these parts.` : "Sliders stop at the smallest size the parts fit in."} {layout.wall} mm walls · about {layout.massG} g assembled.
             </p>
           </Group>
           <Checks checks={compiled.checks.filter((c) => ["fit", "wall", "ports"].includes(c.id))} />

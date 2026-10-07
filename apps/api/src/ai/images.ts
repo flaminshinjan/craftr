@@ -61,13 +61,14 @@ function exterior(nodes: ProjectNode[], compiled: Compiled): string {
 export function renderPrompt(p: { name: string; description: string; nodes: ProjectNode[]; design: DesignConfig; compiled: Compiled }, hasReference: boolean): string {
   const { w, h, d } = p.compiled.layout.outer;
   const round = p.compiled.layout.shape === "round";
-  const form = round ? `a round puck ${w} mm across and ${d} mm thick` : `a rounded box ${w} × ${h} × ${d} mm`;
+  const pocket = p.compiled.layout.pocket;
+  const form = round ? `a round puck ${w} mm across and ${d} mm thick` : p.compiled.layout.card ? `a flat slab ${w} × ${h} mm and ${d} mm thick, the size of a bank card, made to sit on the back of a phone` : `a rounded box ${w} × ${h} × ${d} mm`;
   const colour = COLOR_NAME[p.design.color] ?? `colour ${p.design.color}`;
   return `${hasReference ? "The attached image is a plain CAD preview of a real device. Redraw it as a photorealistic studio product photograph of that same object. Keep its exact shape, proportions and viewing angle, and keep every opening, button, screen and port exactly where the preview shows it. Do not add, remove, enlarge or move any feature." : "A photorealistic studio product photograph of a small electronic device, seen from a front three-quarter angle."}
 
 The device: "${p.name}". ${p.description}
 It is ${form}: a 3D-printed enclosure in matte ${colour} ${p.design.material} plastic${hasReference ? ", whatever colour the preview uses" : ""}, ${STYLE_LOOK[p.design.style]}, with the fine, slightly grainy surface of a good-quality print and a thin seam where the front cover meets the body. It is small enough to sit in a hand.
-Visible details: ${exterior(p.nodes, p.compiled) || "clean, plain faces"}.
+Visible details: ${[pocket ? `a shallow card pocket moulded onto the front face with a thumb notch at the top, holding ${pocket.cards} bank card${pocket.cards > 1 ? "s" : ""} that stick out above it` : "", exterior(p.nodes, p.compiled)].filter(Boolean).join("; ") || "clean, plain faces"}.
 
 Shot on a seamless warm off-white backdrop with soft, diffused studio light and a gentle natural shadow underneath. Realistic materials and scale, sharp focus on the device. Nothing else in the frame: no props, no hands, no text, no logos, no labels.`;
 }

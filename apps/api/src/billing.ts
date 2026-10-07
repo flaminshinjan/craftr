@@ -28,7 +28,8 @@ export async function adjust(userId: string, delta: number, reason: string, ref?
  * so people only pay for work they actually received. Admins are not charged.
  */
 export async function charge(user: User, action: ActionId, ref?: string): Promise<() => Promise<void>> {
-  if (user.role === "admin") return async () => {};
+  // Nothing is charged until payments are connected, so nobody can run out with no way to top up.
+  if (user.role === "admin" || !hasBilling()) return async () => {};
   const cost = creditsFor(action);
   const left = await adjust(user.id, -cost, ACTIONS[action].label, ref);
   if (left === null) throw new HTTPException(402, { message: `This needs ${cost} credits and you have ${user.credits}. Add credits on the Billing page to continue.` });
