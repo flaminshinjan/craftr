@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuthModal } from "@/components/auth-link";
 import { useAuth } from "@clerk/nextjs";
 import { BLOCK_MAP } from "@craftr/core";
 import { useQuery } from "@tanstack/react-query";
@@ -16,12 +17,13 @@ export default function Proven() {
   const { isSignedIn } = useAuth();
   const api = useApi();
   const router = useRouter();
+  const openAuth = useAuthModal();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const q = useQuery({ queryKey: ["templates"], queryFn: async () => (await fetch(`${API_URL}/templates`)).json() as Promise<TemplateSummary[]> });
 
   const remix = async (templateId: string) => {
-    if (!isSignedIn) return router.push("/sign-up");
+    if (!isSignedIn) return openAuth("sign-up");
     setBusy(templateId);
     setError("");
     try {

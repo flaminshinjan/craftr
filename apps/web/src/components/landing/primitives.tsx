@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { ArrowRight, Box, Cpu, Factory, Folder, Hammer, ReceiptText, Settings, Shapes } from "lucide-react";
-import Link from "next/link";
+import { AuthLink } from "@/components/auth-link";
 
 export const container = "mx-auto w-full max-w-[1600px] px-5 sm:px-8 lg:px-14 2xl:px-20";
 
@@ -41,11 +41,11 @@ export function Feature({ icon, tone = "leaf", title, children, large }: { icon:
   );
 }
 
-export function PrimaryCta({ href = "/sign-up", children, className }: { href?: string; children: React.ReactNode; className?: string }) {
+export function PrimaryCta({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <Link href={href} className={clsx("inline-flex h-[60px] items-center gap-4 rounded-full bg-ink px-8 text-[18px] font-medium text-white shadow-soft transition hover:bg-black", className)}>
+    <AuthLink mode="sign-up" className={clsx("inline-flex h-[60px] items-center gap-4 rounded-full bg-ink px-8 text-[18px] font-medium text-white shadow-soft transition hover:bg-black", className)}>
       {children} <ArrowRight className="size-5" />
-    </Link>
+    </AuthLink>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuthModal } from "@/components/auth-link";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ChevronRight } from "lucide-react";
@@ -19,6 +20,7 @@ export function Home() {
   const { isSignedIn, isLoaded } = useAuth();
   const api = useApi();
   const router = useRouter();
+  const openAuth = useAuthModal();
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState<"prompt" | "blocks" | null>(null);
   const [error, setError] = useState("");
@@ -28,7 +30,7 @@ export function Home() {
     if (kind === "prompt" && text.trim().length < 3) return setError("Describe what you want to build, in a sentence.");
     if (!isSignedIn) {
       sessionStorage.setItem(PENDING, kind === "prompt" ? text : "");
-      return router.push("/sign-up");
+      return openAuth("sign-up");
     }
     setBusy(kind);
     setError("");

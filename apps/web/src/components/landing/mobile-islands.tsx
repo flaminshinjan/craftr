@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthLink } from "@/components/auth-link";
 import clsx from "clsx";
 import { ArrowRight, Box, ChevronDown, Copy, FileText, IndianRupee, Menu, Plus, Search, Trash2, Wrench, X, Zap } from "lucide-react";
 import Image from "next/image";
@@ -36,12 +37,12 @@ export function MobileHeader() {
               {label}
             </a>
           ))}
-          <Link href="/sign-in" className="flex h-14 items-center border-b border-line text-[19px] font-medium">
+          <AuthLink mode="sign-in" onClick={() => setOpen(false)} className="flex h-14 items-center border-b border-line text-[19px] font-medium">
             Sign in
-          </Link>
-          <Link href="/sign-up" className="mt-5 flex h-14 items-center justify-center gap-3 rounded-full bg-ink text-[18px] font-medium text-white">
+          </AuthLink>
+          <AuthLink mode="sign-up" onClick={() => setOpen(false)} className="mt-5 flex h-14 items-center justify-center gap-3 rounded-full bg-ink text-[18px] font-medium text-white">
             Get started <ArrowRight className="size-5" />
-          </Link>
+          </AuthLink>
         </nav>
       )}
     </header>
@@ -91,9 +92,9 @@ export function MobileComponents() {
             <span className="mt-2 block text-[14.5px] leading-tight font-semibold">{p.name}</span>
             <span className="mt-auto flex items-center justify-between gap-1 pt-1">
               <span className="text-[12.5px] leading-snug text-ink-3">{p.sub}</span>
-              <Link href="/sign-up" aria-label={`Start a build with the ${p.name}`} className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sand/80">
+              <AuthLink mode="sign-up" aria-label={`Start a build with the ${p.name}`} className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sand/80">
                 <Plus className="size-5" />
-              </Link>
+              </AuthLink>
             </span>
           </li>
         ))}

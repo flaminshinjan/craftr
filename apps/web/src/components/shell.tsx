@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthLink } from "@/components/auth-link";
 import { UserButton, useAuth } from "@clerk/nextjs";
 import clsx from "clsx";
 import { Box, ChevronDown, Coins, Cpu, Factory, Folder, Hammer, Menu, Package, Plus, ReceiptText, Settings, Shapes, ShieldCheck, X } from "lucide-react";
@@ -56,9 +57,9 @@ export function Avatar() {
   if (!isLoaded) return <div className="size-10 rounded-full bg-sand" />;
   if (!isSignedIn)
     return (
-      <Link href="/sign-in" className="flex h-11 items-center rounded-xl bg-ink px-4 font-medium text-white">
+      <AuthLink mode="sign-in" className="flex h-11 items-center rounded-xl bg-ink px-4 font-medium text-white">
         Sign in
-      </Link>
+      </AuthLink>
     );
   return <UserButton appearance={{ elements: { avatarBox: { width: 40, height: 40 } } }} />;
 }

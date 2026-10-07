@@ -1,3 +1,4 @@
+import { AuthLink } from "@/components/auth-link";
 import clsx from "clsx";
 import { ArrowLeft, ArrowRight, Box, ChevronRight, CirclePlay, ClipboardCheck, CloudUpload, Code, Cog, Cpu, Droplet, Factory, FileCheck, Hand, Package, ReceiptText, RefreshCw, Sparkle, Sprout, Sun, Terminal, Thermometer, Upload, Wrench, Zap } from "lucide-react";
 import Image from "next/image";
@@ -86,12 +87,12 @@ function Header() {
           ))}
         </nav>
         <div className="flex items-center gap-3 sm:gap-7">
-          <Link href="/sign-in" className="text-[16.5px] hover:text-ink-2">
+          <AuthLink mode="sign-in" className="text-[16.5px] hover:text-ink-2">
             Sign in
-          </Link>
-          <Link href="/sign-up" className="flex h-12 items-center gap-3 rounded-full bg-ink px-5 text-[16px] font-medium text-white transition hover:bg-black sm:h-[52px] sm:px-7">
+          </AuthLink>
+          <AuthLink mode="sign-up" className="flex h-12 items-center gap-3 rounded-full bg-ink px-5 text-[16px] font-medium text-white transition hover:bg-black sm:h-[52px] sm:px-7">
             Get started <ArrowRight className="size-[18px]" />
-          </Link>
+          </AuthLink>
         </div>
       </div>
     </header>

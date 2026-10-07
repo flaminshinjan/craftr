@@ -1,20 +1,20 @@
 "use client";
 
+import { AuthLink, useAuthModal } from "@/components/auth-link";
 import clsx from "clsx";
 import { ArrowRight, Box, Boxes, ChevronDown, Cog, Cpu, Layers, Leaf, Monitor, Plus, Radio, Search, Trash2, Wifi, Zap } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const PENDING = "craftr:pending-prompt";
 /** Carries an idea through sign-up; it is waiting in the workspace prompt afterwards. */
 export function useStartWith() {
-  const router = useRouter();
+  const open = useAuthModal();
   return (idea: string) => {
     try {
       sessionStorage.setItem(PENDING, idea.trim());
     } catch {}
-    router.push("/sign-up");
+    open("sign-up");
   };
 }
 
@@ -138,9 +138,9 @@ export function ComponentBrowser({ children }: { children: React.ReactNode }) {
                   <span className={clsx("flex min-w-0 items-center gap-1 rounded-full px-2 py-1.5 text-[11.5px] font-medium", C.pill)}>
                     <C.icon className="size-3.5 shrink-0" /> <span className="truncate">{p.cat}</span>
                   </span>
-                  <Link href="/sign-up" aria-label={`Start a build with the ${p.name}`} className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sand transition hover:bg-line">
+                  <AuthLink mode="sign-up" aria-label={`Start a build with the ${p.name}`} className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sand transition hover:bg-line">
                     <Plus className="size-4" />
-                  </Link>
+                  </AuthLink>
                 </span>
               </li>
             );

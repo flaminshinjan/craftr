@@ -1,3 +1,4 @@
+import { AuthLink } from "@/components/auth-link";
 import { DEFAULT_DESIGN, DEFAULT_SPEC, compile, nodesFromBlocks } from "@craftr/core";
 import clsx from "clsx";
 import { ArrowRight, Box, BoxSelect, Check, CircleCheck, CirclePlay, ClipboardList, Code, Cog, Cpu, Droplet, Factory, MessageSquareMore, Play, ReceiptText, Settings, ShieldCheck, Sparkle, Sun, Tag, Thermometer, Truck } from "lucide-react";
@@ -115,9 +116,9 @@ export function MobileLanding({ designVariants }: { designVariants: string[] }) 
             </h1>
             <p className="mx-auto mt-4 max-w-[340px] text-[18.5px] leading-[1.35] text-ink-3">Design, simulate, and manufacture custom hardware with the help of AI.</p>
             <div className="mt-6 flex justify-center gap-2.5">
-              <Link href="/sign-up" className="flex h-[52px] items-center gap-2.5 rounded-full bg-ink px-5 text-[16px] font-medium text-white shadow-soft active:bg-black">
+              <AuthLink mode="sign-up" className="flex h-[52px] items-center gap-2.5 rounded-full bg-ink px-5 text-[16px] font-medium text-white shadow-soft active:bg-black">
                 Start building <ArrowRight className="size-[18px]" />
-              </Link>
+              </AuthLink>
               <a href="#m-build" className="flex h-[52px] items-center gap-2 rounded-full border border-line bg-card px-4 text-[16px] font-medium">
                 <CirclePlay className="size-[22px]" strokeWidth={1.7} /> Watch demo
               </a>
@@ -271,9 +272,9 @@ export function MobileLanding({ designVariants }: { designVariants: string[] }) 
           {/* The supplied scene, with the stray mock-up text in its lower-left corner clipped away. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={img("manufacturing_factory_scene")} alt="A block-style factory line: robot arms assemble plant monitors, which are boxed and stacked on a pallet" width={867} height={842} loading="lazy" className="mx-auto mt-4 w-full max-w-[460px]" style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 30% 100%, 30% 64%, 0 64%)", maskImage: "linear-gradient(to left, transparent 0%, black 10%)", WebkitMaskImage: "linear-gradient(to left, transparent 0%, black 10%)" }} />
-          <Link href="/sign-up" className="mt-5 flex h-[60px] items-center justify-center gap-4 rounded-full bg-ink text-[18px] font-medium text-white shadow-soft active:bg-black">
+          <AuthLink mode="sign-up" className="mt-5 flex h-[60px] items-center justify-center gap-4 rounded-full bg-ink text-[18px] font-medium text-white shadow-soft active:bg-black">
             Get manufacturing quote <ArrowRight className="size-5" />
-          </Link>
+          </AuthLink>
           <ul className="mt-7 grid grid-cols-3 divide-x divide-line">
             {(
               [
@@ -319,9 +320,9 @@ export function MobileLanding({ designVariants }: { designVariants: string[] }) 
               device?
             </h2>
             <p className="mx-auto mt-4 max-w-[320px] text-[18.5px] leading-[1.35] text-ink-3">Describe your idea today and hold a working prototype in a couple of weeks.</p>
-            <Link href="/sign-up" className="mx-auto mt-6 flex h-[60px] w-fit items-center gap-4 rounded-full bg-ink px-9 text-[19px] font-medium text-white shadow-soft active:bg-black">
+            <AuthLink mode="sign-up" className="mx-auto mt-6 flex h-[60px] w-fit items-center gap-4 rounded-full bg-ink px-9 text-[19px] font-medium text-white shadow-soft active:bg-black">
               Get started <ArrowRight className="size-5" />
-            </Link>
+            </AuthLink>
           </div>
           <div className="relative -mx-5 mt-4 aspect-[10/9.4] overflow-hidden">
             <Device className="absolute top-0 left-1/2 h-full w-auto max-w-none -translate-x-[40%]" />
