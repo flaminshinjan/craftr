@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${body.variable} ${heading.variable} ${code.variable} ${tight.variable} h-full`}>
       <body className="min-h-full">
-        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" appearance={{ variables: { colorPrimary: "#1b1b1a", borderRadius: "0.75rem", fontFamily: "var(--font-body)" } }}>
+        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" appearance={{ variables: { colorPrimary: "#1b1b1a", borderRadius: "0.75rem", fontFamily: "var(--font-body)" }, elements: { modalContent: { margin: "auto" } } }}>
           <Providers>{children}</Providers>
         </ClerkProvider>
       </body>
