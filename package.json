@@ -1,0 +1,17 @@
+{
+  "name": "craftr",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "pnpm --filter @craftr/core test",
+    "db:push": "pnpm --filter @craftr/db push",
+    "db:studio": "pnpm --filter @craftr/db studio"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #f3eee7;
+  --color-paper: #fbf8f4;
+  --color-card: #fffdfa;
+  --color-line: #ece6dd;
+  --color-line-2: #dfd7ca;
+  --color-ink: #1b1b1a;
+  --color-ink-2: #5e5b55;
+  --color-ink-3: #9a958c;
+  --color-sand: #f4ede2;
+  --color-tan: #c9ae8c;
+  --color-tan-dark: #b3966f;
+  --color-leaf: #4e9a47;
+  --color-leaf-dark: #2f6b2a;
+  --color-leaf-soft: #eaf3e4;
+  --color-sun: #f2b62c;
+  --color-sun-soft: #fcf2dc;
+  --color-lilac: #eceafb;
+  --color-rose: #c8453f;
+  --color-rose-soft: #fbeceb;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-code), ui-monospace, monospace;
+  --shadow-soft: 0 1px 2px rgb(60 45 20 / 0.04), 0 8px 24px -12px rgb(60 45 20 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(60 45 20 / 0.05), 0 18px 40px -18px rgb(60 45 20 / 0.22);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-tan);
+  outline-offset: 2px;
+}
+
+.dot-grid {
+  background-image: radial-gradient(var(--color-line-2) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-2) transparent;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-tan) var(--fill, 50%), var(--color-line) var(--fill, 50%));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--color-line-2);
+  box-shadow: 0 2px 6px rgb(60 45 20 / 0.18);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--color-line-2);
+  box-shadow: 0 2px 6px rgb(60 45 20 / 0.18);
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.pop {
+  animation: pop 0.25s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .float,
+  .pop,
+  .animate-spin,
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/* Landing page */
+.landing {
+  /* Everything that uses the heading font inside the landing page picks this up. */
+  --font-heading: var(--font-tight);
+}
+.display {
+  font-family: var(--font-tight), var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.lift {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.drift {
+  animation: drift 9s ease-in-out infinite;
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+/* Sections ease in as they scroll into view, in browsers that can do it without script. */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 32%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drift,
+  .reveal {
+    animation: none;
+  }
+  .lift,
+  .lift:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Renders whose platform runs to the edge of the file: fade the edge out so no straight cut shows. */
+.soft-edge {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%), linear-gradient(to top, transparent 0%, #000 12%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%), linear-gradient(to top, transparent 0%, #000 12%);
+  mask-composite: intersect;
+}
+
+/* Dimension sliders on the mobile landing page use the green accent. */
+input[type="range"].m-range {
+  height: 7px;
+  background: linear-gradient(to right, #6cb35a var(--fill, 50%), var(--color-line) var(--fill, 50%));
+}
+
+/* The landing headline face, for smaller headings inside cards. */
+.tight {
+  font-family: var(--font-tight), var(--font-display);
+  letter-spacing: -0.02em;
+}

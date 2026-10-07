@@ -1,0 +1,20 @@
+{
+  "name": "@craftr/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "push": "drizzle-kit push",
+    "studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@craftr/core": "workspace:*",
+    "@neondatabase/serverless": "^1",
+    "drizzle-orm": "^0.45"
+  },
+  "devDependencies": { "drizzle-kit": "latest", "dotenv": "^16", "typescript": "^5", "@types/node": "^20" }
+}
