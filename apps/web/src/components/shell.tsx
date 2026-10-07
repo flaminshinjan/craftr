@@ -9,6 +9,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMe } from "@/lib/api";
 
+/** Billing shows only where it is switched on, so the web app can ship ahead of the billing api. */
+const BILLING = process.env.NEXT_PUBLIC_BILLING === "1";
 const LAST_KEY = "craftr:last-project";
 export const rememberProject = (id: string) => {
   try {
@@ -92,7 +94,7 @@ export function Shell({ active, projectId, children, flush }: { active: NavKey; 
   const bottom: [NavKey, string, string, typeof Box][] = [
     ["orders", "Orders", "/orders", Package],
     ["projects", "Projects", "/projects", Folder],
-    ["billing", "Billing", "/billing", Coins],
+    ...(BILLING ? ([["billing", "Billing", "/billing", Coins]] as [NavKey, string, string, typeof Box][]) : []),
     ["settings", "Settings", "/settings", Settings],
     ...(me?.role === "admin" ? ([["admin", "Admin", "/admin", ShieldCheck]] as [NavKey, string, string, typeof Box][]) : []),
   ];
@@ -114,7 +116,7 @@ export function Shell({ active, projectId, children, flush }: { active: NavKey; 
         <nav className="flex flex-col gap-1">{top.map(item)}</nav>
         <div className="mx-2.5 my-5 border-t border-line" />
         <nav className="flex flex-col gap-1">{bottom.map(item)}</nav>
-        {me && (
+        {BILLING && me && me.credits != null && (
           <Link href="/billing" className="mt-auto flex items-center justify-between rounded-xl border border-line bg-card px-3.5 py-3 text-[13.5px] hover:border-line-2">
             <span className="flex items-center gap-2 text-ink-2">
               <Coins className="size-4 text-sun" /> Credits

@@ -339,7 +339,7 @@ export function MobileProduct({ image, title, body, price, idea }: { image: stri
         <span className="mt-1.5 block text-[14px] leading-snug text-ink-2">{body}</span>
         <span className="mt-3 flex items-center justify-between gap-1.5">
           <span className="flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-line bg-card px-2.5 text-[12.5px] whitespace-nowrap">
-            <Box className="size-3.5 shrink-0 text-leaf" /> <b className="font-semibold">{price}</b> <span className="truncate text-ink-2">(prototype)</span>
+            <Box className="size-3.5 shrink-0 text-leaf" /> <b className="font-semibold">{price}</b> <span className="truncate text-ink-2">prototype</span>
           </span>
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-sand text-[#7a5a2e]">
             <ArrowRight className="size-5" />

@@ -1,3 +1,4 @@
+import { DEFAULT_DESIGN, DEFAULT_SPEC, compile, nodesFromBlocks } from "@craftr/core";
 import clsx from "clsx";
 import { ArrowRight, Box, BoxSelect, Check, CircleCheck, CirclePlay, ClipboardList, Code, Cog, Cpu, Droplet, Factory, MessageSquareMore, Play, ReceiptText, Settings, ShieldCheck, Sparkle, Sun, Tag, Thermometer, Truck } from "lucide-react";
 import Image from "next/image";
@@ -61,6 +62,21 @@ const Device = ({ className, priority }: { className?: string; priority?: boolea
   <Image src="/landing/design_cream.webp" alt="A smart plant monitor: a cream cube with a screen showing soil moisture, and a plant growing from the top" width={1024} height={1536} priority={priority} sizes="(max-width: 767px) 90vw, 1px" className={clsx("drift soft-edge", className)} />
 );
 const Sunflower = ({ className }: { className?: string }) => <Image src="/brand/sunflower.png" alt="" width={256} height={256} sizes="(max-width: 767px) 30vw, 1px" className={clsx("pointer-events-none absolute", className)} />;
+
+/**
+ * Prototype prices come from the same pricing engine the app uses, for a representative set of
+ * blocks, so a visitor sees a figure close to what they will be quoted after signing in.
+ */
+const from = (blocks: string[], battery: boolean) => {
+  const { pricing } = compile({ nodes: nodesFromBlocks(blocks), design: DEFAULT_DESIGN, spec: { ...DEFAULT_SPEC, power_source: battery ? "battery" : "usb" } });
+  return `from ₹${pricing.unitInr.toLocaleString("en-IN")}`;
+};
+const PRICE = {
+  plant: from(["esp32_devkit", "soil_moisture", "dht22", "oled_096", "lipo_1000", "charger_tp4056"], true),
+  pet: from(["esp32_c3_supermini", "gps", "led", "lipo_500", "charger_tp4056"], true),
+  weather: from(["esp32_devkit", "sht31", "bh1750", "oled_096", "solar_panel", "lipo_1000", "charger_tp4056"], true),
+  home: from(["esp32_devkit", "pir", "dht22", "led"], false),
+};
 
 const STEPS: [React.ReactNode, string, string][] = [
   [<MessageSquareMore key="i" className="text-[#8fb07c]" />, "Describe", "Tell Craftr what you want to build."],
@@ -285,10 +301,10 @@ export function MobileLanding({ designVariants }: { designVariants: string[] }) 
           </Headline>
           <Lede>start from proven builds and customize them.</Lede>
           <div className="mt-6 flex flex-col gap-3.5">
-            <MobileProduct image="product_smart_plant_monitor" title="Smart Plant Monitor" body="Measures soil moisture and sends data to your phone." price="₹920" idea="Build a smart plant monitor that measures soil moisture and sends data to my phone." />
-            <MobileProduct image="product_pet_tracker" title="Pet Tracker" body="Track your pet's location with GPS and BLE." price="₹780" idea="Make me a pet tracker with GPS and Bluetooth that clips to a collar." />
-            <MobileProduct image="product_weather_station" title="Weather Station" body="Monitor temperature, humidity and air quality." price="₹1,240" idea="Build a small weather station that measures temperature, humidity and light and logs it over Wi-Fi." />
-            <MobileProduct image="product_home_automation" title="Home Automation Hub" body="Control lights, sensors and more from one hub." price="₹1,080" idea="Make a home automation hub that detects presence and reports to my phone." />
+            <MobileProduct image="product_smart_plant_monitor" title="Smart Plant Monitor" body="Measures soil moisture and sends data to your phone." price={PRICE.plant} idea="Build a smart plant monitor that measures soil moisture and sends data to my phone." />
+            <MobileProduct image="product_pet_tracker" title="Pet Tracker" body="Track your pet's location with GPS and BLE." price={PRICE.pet} idea="Make me a pet tracker with GPS and Bluetooth that clips to a collar." />
+            <MobileProduct image="product_weather_station" title="Weather Station" body="Monitor temperature, humidity and air quality." price={PRICE.weather} idea="Build a small weather station that measures temperature, humidity and light and logs it over Wi-Fi." />
+            <MobileProduct image="product_home_automation" title="Home Automation Hub" body="Control lights, sensors and more from one hub." price={PRICE.home} idea="Make a home automation hub that detects presence and reports to my phone." />
           </div>
         </Section>
 
@@ -302,7 +318,7 @@ export function MobileLanding({ designVariants }: { designVariants: string[] }) 
               <br />
               device?
             </h2>
-            <p className="mx-auto mt-4 max-w-[320px] text-[18.5px] leading-[1.35] text-ink-3">Join thousands of makers and companies building real hardware with Craftr.</p>
+            <p className="mx-auto mt-4 max-w-[320px] text-[18.5px] leading-[1.35] text-ink-3">Describe your idea today and hold a working prototype in a couple of weeks.</p>
             <Link href="/sign-up" className="mx-auto mt-6 flex h-[60px] w-fit items-center gap-4 rounded-full bg-ink px-9 text-[19px] font-medium text-white shadow-soft active:bg-black">
               Get started <ArrowRight className="size-5" />
             </Link>
