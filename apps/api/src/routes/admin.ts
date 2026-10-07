@@ -4,6 +4,7 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { hasImages, renderBlock } from "../ai/images";
+import { findPrintShops } from "../ai/shops";
 import { requireAdmin, requireUser, type AppEnv } from "../auth";
 import { bad } from "../lib";
 
@@ -106,17 +107,38 @@ adminRoutes.post("/orders/:id/notes", async (c) => {
 
 adminRoutes.get("/partners", async (c) => c.json(await db().select().from(partners).orderBy(asc(partners.type), asc(partners.name))));
 
+const DETAILS = ["contact", "city", "phone", "website", "address", "notes"] as const;
+type PartnerBody = { name?: string; type?: PartnerType; active?: boolean } & Partial<Record<(typeof DETAILS)[number], string>>;
+const details = (b: PartnerBody) => Object.fromEntries(DETAILS.filter((k) => typeof b[k] === "string").map((k) => [k, b[k]!.trim().slice(0, 500)]));
+
 adminRoutes.post("/partners", async (c) => {
-  const b = await c.req.json<{ name: string; type: PartnerType; contact?: string; city?: string }>();
-  if (!b.name?.trim() || !PARTNER_TYPES.includes(b.type)) bad("A partner needs a name and a type.");
-  const [row] = await db().insert(partners).values({ id: nanoid(10), name: b.name.trim(), type: b.type, contact: b.contact?.trim() ?? "", city: b.city?.trim() ?? "" }).returning();
+  const b = await c.req.json<PartnerBody>();
+  const name = b.name?.trim().slice(0, 120);
+  const type = PARTNER_TYPES.find((t) => t === b.type);
+  if (!name || !type) return bad("A partner needs a name and a type.");
+  const [row] = await db().insert(partners).values({ id: nanoid(10), name, type, ...details(b) }).returning();
   return c.json(row);
 });
 
 adminRoutes.patch("/partners/:id", async (c) => {
-  const { active } = await c.req.json<{ active: boolean }>();
-  await db().update(partners).set({ active: !!active }).where(eq(partners.id, c.req.param("id")));
+  const b = await c.req.json<PartnerBody>();
+  const set = { ...details(b), ...(typeof b.active === "boolean" ? { active: b.active } : {}) };
+  if (Object.keys(set).length) await db().update(partners).set(set).where(eq(partners.id, c.req.param("id")));
   return c.json({ ok: true });
+});
+
+/** Live web search for 3D printing services near a place. Nothing is saved until the admin adds a result as a partner. */
+adminRoutes.post("/partners/search", async (c) => {
+  const { location } = await c.req.json<{ location?: string }>();
+  const where = location?.trim().slice(0, 200);
+  if (!where) return bad("Type a city or area to search near.");
+  if (!hasImages()) bad("Searching needs OPENAI_API_KEY on the api.", 422);
+  try {
+    return c.json({ shops: await findPrintShops(where) });
+  } catch (e) {
+    console.error("print shop search failed", e);
+    return bad("The search did not finish. Try again in a moment.", 422);
+  }
 });
 
 adminRoutes.get("/users", async (c) => {

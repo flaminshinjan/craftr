@@ -203,6 +203,11 @@ function Detail({ o, partners }: { o: AdminOrder; partners: Partner[] }) {
                 </select>
               </label>
             </div>
+            {partners.filter((p) => (p.id === o.designerId || p.id === o.printerId) && p.phone).map((p) => (
+              <p key={p.id} className="mt-3 text-[13px] text-ink-2">
+                {p.name}: <a href={`tel:${p.phone.replace(/[^\d+]/g, "")}`} className="font-medium text-ink underline">Call {p.phone}</a>
+              </p>
+            ))}
             {!partners.length && (
               <p className="mt-3 text-[13px] text-ink-2">
                 No partners yet. <Link href="/admin/partners" className="underline">Add a designer or print partner</Link>.

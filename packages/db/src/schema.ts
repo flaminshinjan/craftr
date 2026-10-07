@@ -104,6 +104,11 @@ export const partners = pgTable("partners", {
   type: text("type").$type<PartnerType>().notNull(),
   contact: text("contact").notNull().default(""),
   city: text("city").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  website: text("website").notNull().default(""),
+  address: text("address").notNull().default(""),
+  /** What they offer and why they were picked, e.g. "FDM, SLA. No minimum order." */
+  notes: text("notes").notNull().default(""),
   active: boolean("active").notNull().default(true),
   createdAt,
 });

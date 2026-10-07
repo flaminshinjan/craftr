@@ -162,5 +162,22 @@ export interface Partner {
   type: PartnerType;
   contact: string;
   city: string;
+  phone: string;
+  website: string;
+  address: string;
+  notes: string;
   active: boolean;
+}
+
+/** A print shop found by the web search, not yet saved as a partner. */
+export interface FoundShop {
+  name: string;
+  area: string;
+  city: string;
+  address: string;
+  phone: string;
+  website: string;
+  services: string;
+  note: string;
+  source: string;
 }

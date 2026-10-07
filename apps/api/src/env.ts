@@ -25,6 +25,7 @@ export const env = {
   anthropicKey: process.env.ANTHROPIC_API_KEY || undefined,
   openaiKey: process.env.OPENAI_API_KEY || undefined,
   imageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
+  searchModel: process.env.OPENAI_SEARCH_MODEL || "gpt-5-mini",
   dodoKey: process.env.DODO_PAYMENTS_API_KEY || undefined,
   dodoWebhookKey: process.env.DODO_PAYMENTS_WEBHOOK_KEY || undefined,
   dodoMode: (process.env.DODO_PAYMENTS_ENVIRONMENT === "live_mode" ? "live_mode" : "test_mode") as "live_mode" | "test_mode",
