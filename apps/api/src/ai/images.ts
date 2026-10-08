@@ -34,6 +34,15 @@ const COLOR_NAME: Record<string, string> = { "#F2EBDD": "warm cream", "#5FA052":
 const FACE_NAME: Record<string, string> = { "#1B1B1A": "matte black", "#F7F4EE": "off-white" };
 const STYLE_LOOK = { minimal: "clean, with soft rounded edges", rugged: "sturdy, with thick walls", compact: "slim and tight-fitting" };
 
+/** What the screen should read, so a clock shows the time and a thermometer shows a temperature. */
+function screenText(nodes: ProjectNode[]): string {
+  const has = (...ids: string[]) => nodes.some((n) => ids.includes(n.blockId));
+  if (has("dht22", "sht31", "ds18b20")) return 'two lines of large, crisp white text: "24°C" on the first line and "62%" on the second';
+  if (has("soil_moisture")) return 'two lines of large, crisp white text: "Soil" on the first line and "42%" on the second';
+  if (has("mpu6050")) return 'one word in very large, crisp white capital letters, centred: "YES"';
+  return 'two lines of crisp white text: the time "10:24" in large digits on the first line and "Thu 8 Oct" in smaller letters on the second';
+}
+
 /** Describes what is visible on the outside, from the real layout, so the picture matches the design. */
 function exterior(nodes: ProjectNode[], compiled: Compiled): string {
   const seen = new Set<string>();
@@ -42,7 +51,7 @@ function exterior(nodes: ProjectNode[], compiled: Compiled): string {
     const b = getBlock(n.blockId);
     if (!b || seen.has(b.id)) continue;
     seen.add(b.id);
-    if (b.id === "oled_096") bits.push('a small black OLED screen behind a rectangular window, switched on and showing exactly two lines of large, crisp white text: "24°C" on the first line and "62%" on the second, perfectly legible and nothing else on the screen');
+    if (b.id === "oled_096") bits.push(`a small black OLED screen behind a rectangular window, switched on and showing exactly ${screenText(nodes)}, perfectly legible and nothing else on the screen`);
     else if (b.category === "display") bits.push("a small colour screen behind a square window, switched on");
     else if (b.id === "button") bits.push("one round push-button cap, flush with the front");
     else if (b.id === "rotary_encoder") bits.push("a round control knob on the front");
