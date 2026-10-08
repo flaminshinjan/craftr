@@ -104,7 +104,10 @@ export interface ProjectNode {
 }
 
 export type EnclosureStyle = "minimal" | "rugged" | "compact";
-export type Material = "PLA" | "ABS" | "PETG" | "PC";
+/** rPLA and rPETG are recycled-content filaments, and are what new designs use. ABS and PC remain only for older designs. */
+export type Material = "rPLA" | "rPETG" | "PLA" | "PETG" | "ABS" | "PC";
+/** chalk: a dead-matte, slightly powdery surface from matte-grade filament. smooth: the usual soft sheen. */
+export type Finish = "chalk" | "smooth";
 
 /** box: rounded box. round: puck. card: a flat slab the size of a phone's back, for wallets and battery packs. */
 export type EnclosureShape = "box" | "round" | "card";
@@ -116,6 +119,8 @@ export interface DesignConfig {
   pocketCards?: number;
   style: EnclosureStyle;
   material: Material;
+  /** Surface finish. Left out, it is chalk. */
+  finish?: Finish;
   color: string;
   /** A wedge under a box so it leans back on a desk. Ignored on other shapes. */
   stand?: boolean;

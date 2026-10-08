@@ -133,6 +133,7 @@ function patchDesign(cur: DesignConfig, patch: Partial<Record<keyof DesignConfig
     else delete d.face;
   }
   if (typeof patch.stand === "boolean") d.stand = patch.stand;
+  if (patch.finish === "chalk" || patch.finish === "smooth") d.finish = patch.finish;
   if (typeof patch.auto === "boolean") d.auto = patch.auto;
   for (const k of ["width", "height", "depth"] as const) {
     const v = Number(patch[k]);

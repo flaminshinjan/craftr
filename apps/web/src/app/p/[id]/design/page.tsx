@@ -1,8 +1,8 @@
 "use client";
 
-import { COLORS, MATERIAL, STYLE, compile, type DesignConfig, type EnclosureStyle, type Material } from "@craftr/core";
+import { COLORS, FINISH, MATERIAL, MATERIAL_CHOICES, STYLE, compile, type DesignConfig, type EnclosureStyle, type Finish } from "@craftr/core";
 import clsx from "clsx";
-import { ArrowRight, Box, Circle, Download, Maximize2, RectangleVertical, Sparkles } from "lucide-react";
+import { ArrowRight, Box, Circle, Download, Maximize2, RectangleVertical, Sparkles, Recycle } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -143,14 +143,26 @@ function Design({ p }: { p: Project }) {
           </Group>
           <Group label="Material">
             <div className="grid grid-cols-4 gap-3">
-              {(Object.keys(MATERIAL) as Material[]).map((m) => (
+              {[...MATERIAL_CHOICES, ...(MATERIAL_CHOICES.includes(design.material) ? [] : [design.material])].map((m) => (
                 <Option key={m} active={design.material === m} onClick={() => set({ material: m })} title={MATERIAL[m].blurb}>
-                  <Box className={clsx("size-7", design.material === m ? "text-ink" : "text-ink-3/60")} strokeWidth={1.5} />
+                  {MATERIAL[m].recycled ? <Recycle className={clsx("size-7", design.material === m ? "text-leaf-dark" : "text-ink-3/60")} strokeWidth={1.5} /> : <Box className={clsx("size-7", design.material === m ? "text-ink" : "text-ink-3/60")} strokeWidth={1.5} />}
                   {m}
                 </Option>
               ))}
             </div>
-            <p className="mt-2 text-[13px] text-ink-3">{MATERIAL[design.material].blurb}</p>
+            <p className="mt-2 text-[13px] text-ink-3">
+              <b className="font-medium text-ink-2">{MATERIAL[design.material].name}.</b> {MATERIAL[design.material].blurb}
+            </p>
+          </Group>
+          <Group label="Finish">
+            <div className="grid grid-cols-2 gap-3">
+              {(Object.keys(FINISH) as Finish[]).map((f) => (
+                <Option key={f} active={(design.finish ?? "chalk") === f} onClick={() => set({ finish: f })} title={FINISH[f].blurb}>
+                  {FINISH[f].label}
+                </Option>
+              ))}
+            </div>
+            <p className="mt-2 text-[13px] text-ink-3">{FINISH[design.finish ?? "chalk"].blurb}</p>
           </Group>
           <Group label="Color">
             <div className="flex gap-4">
@@ -206,7 +218,7 @@ function Design({ p }: { p: Project }) {
         </div>
 
         <div className="relative min-h-[420px] overflow-hidden rounded-3xl bg-sand/70 lg:min-h-[640px]">
-          <EnclosureViewer ref={viewer} layout={layout} color={design.color} face={design.face} mode={mode} className="absolute inset-0" />
+          <EnclosureViewer ref={viewer} layout={layout} color={design.color} face={design.face} finish={design.finish} mode={mode} className="absolute inset-0" />
           <span className="absolute bottom-4 left-4 rounded-full bg-card/90 px-3 py-1.5 text-[12.5px] text-ink-2">
             {round ? `⌀${layout.outer.w} × ${layout.outer.d}` : `${layout.outer.w} × ${layout.outer.h} × ${layout.outer.d}`} mm · drag to rotate, scroll to zoom
           </span>

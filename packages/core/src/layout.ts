@@ -1,5 +1,5 @@
 import { resolveNodes } from "./wiring";
-import type { BlockDef, CardPocket, DesignConfig, EnclosureStyle, Layout, Material, PlacedCutout, Placement, ProjectNode } from "./types";
+import type { BlockDef, CardPocket, DesignConfig, EnclosureStyle, Finish, Layout, Material, PlacedCutout, Placement, ProjectNode } from "./types";
 
 export const STYLE: Record<EnclosureStyle, { wall: number; radius: number; clearance: number; label: string; blurb: string }> = {
   minimal: { wall: 2, radius: 8, clearance: 1.2, label: "Minimal", blurb: "Soft corners, clean faces" },
@@ -7,11 +7,20 @@ export const STYLE: Record<EnclosureStyle, { wall: number; radius: number; clear
   compact: { wall: 1.6, radius: 5, clearance: 0.6, label: "Compact", blurb: "As small as the parts allow" },
 };
 
-export const MATERIAL: Record<Material, { density: number; inrPerG: number; blurb: string }> = {
-  PLA: { density: 1.24, inrPerG: 1.2, blurb: "Easy, crisp detail, indoor use" },
-  ABS: { density: 1.04, inrPerG: 1.4, blurb: "Tough, handles heat" },
-  PETG: { density: 1.27, inrPerG: 1.5, blurb: "Strong, weather resistant" },
-  PC: { density: 1.2, inrPerG: 2.4, blurb: "Very strong, premium" },
+export const MATERIAL: Record<Material, { name: string; density: number; inrPerG: number; blurb: string; recycled: boolean }> = {
+  rPLA: { name: "Recycled PLA", density: 1.24, inrPerG: 1.3, recycled: true, blurb: "Recycled plastic, crisp detail, indoor use. Can be reground into new filament." },
+  rPETG: { name: "Recycled PETG", density: 1.27, inrPerG: 1.6, recycled: true, blurb: "Recycled plastic, strong and weather resistant. Can be reground into new filament." },
+  PLA: { name: "PLA", density: 1.24, inrPerG: 1.2, recycled: false, blurb: "Plant-based, crisp detail, indoor use. Recyclable through filament recyclers." },
+  PETG: { name: "PETG", density: 1.27, inrPerG: 1.5, recycled: false, blurb: "Strong, weather resistant. Recyclable through filament recyclers." },
+  ABS: { name: "ABS", density: 1.04, inrPerG: 1.4, recycled: false, blurb: "Tough, handles heat. Rarely recycled." },
+  PC: { name: "PC", density: 1.2, inrPerG: 2.4, recycled: false, blurb: "Very strong. Rarely recycled." },
+};
+/** What a new design can be printed in: recycled first, and nothing that cannot be recycled. */
+export const MATERIAL_CHOICES: Material[] = ["rPLA", "rPETG", "PLA", "PETG"];
+
+export const FINISH: Record<Finish, { label: string; blurb: string }> = {
+  chalk: { label: "Chalk", blurb: "Dead matte and slightly powdery, like chalk. Hides layer lines. Printed in matte-grade filament." },
+  smooth: { label: "Smooth", blurb: "The usual soft sheen of a clean print." },
 };
 
 export const COLORS = ["#F2EBDD", "#5FA052", "#D9B98E", "#C9C9C6", "#3F4043"];

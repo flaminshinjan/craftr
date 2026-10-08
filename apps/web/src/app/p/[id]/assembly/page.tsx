@@ -27,7 +27,7 @@ function Assembly({ p }: { p: Project }) {
         <div className="flex flex-col gap-5 lg:sticky lg:top-6">
           <Card className="overflow-hidden">
             <div className="relative aspect-square bg-sand/50">
-              <EnclosureViewer layout={p.compiled.layout} color={p.design.color} face={p.design.face} wires={p.compiled.edges} mode={mode} className="absolute inset-0" />
+              <EnclosureViewer layout={p.compiled.layout} color={p.design.color} face={p.design.face} finish={p.design.finish} wires={p.compiled.edges} mode={mode} className="absolute inset-0" />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3.5">
               <Segmented<ViewMode>

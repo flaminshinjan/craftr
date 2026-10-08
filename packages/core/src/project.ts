@@ -2,7 +2,7 @@ import { getBlock } from "./blocks";
 import { COLORS } from "./layout";
 import type { DesignConfig, Feature, ProductSpec, ProjectDoc, ProjectNode } from "./types";
 
-export const DEFAULT_DESIGN: DesignConfig = { style: "minimal", material: "PETG", color: COLORS[0], auto: true, width: 60, height: 60, depth: 30 };
+export const DEFAULT_DESIGN: DesignConfig = { style: "minimal", material: "rPETG", color: COLORS[0], auto: true, width: 60, height: 60, depth: 30 };
 
 export const DEFAULT_SPEC: ProductSpec = {
   use_case: "",
@@ -83,7 +83,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Make me a small MagSafe voice-note device with one button, rechargeable battery, microphone, and phone sync.",
     description: "A puck that snaps to the back of your phone. Hold the button to record a voice note; it syncs over Bluetooth when you let go.",
     blocks: ["xiao_esp32s3", "mic_inmp441", "button", "led", "lipo_500", "magsafe_ring"],
-    design: { shape: "round", style: "compact", color: "#F2EBDD", face: "#1B1B1A", material: "PETG" },
+    design: { shape: "round", style: "compact", color: "#F2EBDD", face: "#1B1B1A", material: "rPETG" },
     spec: { use_case: "Capture voice notes with one press and sync them to a phone", power_source: "battery", battery_target: "1 week of normal use", battery_target_hours: 72, duty: "event_driven", connectivity: ["Bluetooth LE", "Wi-Fi"], inputs: ["Button", "Microphone"], outputs: ["Status LED"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
   }),
   tpl({
@@ -93,7 +93,7 @@ export const TEMPLATES: Template[] = [
     prompt: "I want a MagSafe wallet plus power bank for my iPhone.",
     description: "A slab that snaps to the back of your iPhone, holds two cards in a front pocket and wirelessly tops up the phone from its own battery. Recharges over USB-C.",
     blocks: ["esp32_c3_supermini", "magsafe_charger", "powerbank_module", "lipo_5000", "led"],
-    design: { shape: "card", pocketCards: 2, style: "compact", color: "#3F4043", material: "PETG" },
+    design: { shape: "card", pocketCards: 2, style: "compact", color: "#3F4043", material: "rPETG" },
     spec: { use_case: "Carry cards and wirelessly top up an iPhone", power_source: "battery", battery_target: "", battery_target_hours: null, duty: "event_driven", connectivity: ["Bluetooth LE"], inputs: [], outputs: ["Status LED", "Wireless phone charging"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
   }),
   tpl({
@@ -103,7 +103,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Build a smart plant monitor that measures soil moisture and sends data to my phone.",
     description: "A Wi-Fi connected plant monitor that measures soil moisture and temperature and sends data to your phone, all in a compact enclosure.",
     blocks: ["esp32_devkit", "soil_moisture", "dht22", "oled_096", "lipo_1000", "charger_tp4056"],
-    design: { style: "minimal", color: "#F2EBDD", face: "#1B1B1A", material: "PETG" },
+    design: { style: "minimal", color: "#F2EBDD", face: "#1B1B1A", material: "rPETG" },
     spec: { use_case: "Monitor soil moisture and temperature for a house plant", power_source: "battery", battery_target: "2 weeks", battery_target_hours: 336, duty: "periodic", connectivity: ["Wi-Fi"], inputs: ["Soil moisture", "Temperature", "Humidity"], outputs: ["OLED display", "Phone notifications"], environment: "Indoor, near soil and water", mounting: "Stakes into the pot" },
   }),
   tpl({
@@ -114,7 +114,7 @@ export const TEMPLATES: Template[] = [
     description: "A focus timer you flip to start. The light ring drains as the session runs and a soft beep tells you when to take a break.",
     blocks: ["esp32_c3_supermini", "mpu6050", "rgb_led", "buzzer", "lipo_500", "charger_tp4056"],
     // A true cube, so it sits the same way on every face.
-    design: { style: "minimal", color: "#D9B98E", material: "PLA", auto: false, width: 52, height: 52, depth: 52 },
+    design: { style: "minimal", color: "#D9B98E", material: "rPLA", auto: false, width: 52, height: 52, depth: 52 },
     spec: { use_case: "Tabletop focus timer controlled by orientation", power_source: "battery", battery_target: "1 week", battery_target_hours: 40, duty: "event_driven", connectivity: ["Bluetooth LE"], inputs: ["Orientation"], outputs: ["Light ring", "Beep"], mounting: "Sits on a desk" },
   }),
   tpl({
@@ -125,7 +125,7 @@ export const TEMPLATES: Template[] = [
     description: "A USB-powered desk display with a precise climate sensor. Shows temperature and humidity and logs them over Wi-Fi.",
     blocks: ["esp32_c3_supermini", "sht31", "oled_096", "bh1750"],
     // Landscape, like a small desk clock.
-    design: { style: "minimal", color: "#5FA052", face: "#1B1B1A", stand: true, material: "PLA", auto: false, width: 64, height: 44, depth: 24 },
+    design: { style: "minimal", color: "#5FA052", face: "#1B1B1A", stand: true, material: "rPLA", auto: false, width: 64, height: 44, depth: 24 },
     spec: { use_case: "Show and log room temperature and humidity", power_source: "usb", duty: "always_on", connectivity: ["Wi-Fi"], inputs: ["Temperature", "Humidity", "Ambient light"], outputs: ["OLED display"], mounting: "Sits on a desk" },
   }),
 ];

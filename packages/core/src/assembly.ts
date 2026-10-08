@@ -1,4 +1,5 @@
 import { getBlock } from "./blocks";
+import { MATERIAL } from "./layout";
 import type { Compiled, DesignConfig, Firmware, ProjectNode } from "./types";
 
 export interface AssemblyStep {
@@ -40,7 +41,7 @@ export function assemblyGuide(p: { nodes: ProjectNode[]; design: DesignConfig; c
   const add = (title: string, body: string, items: string[] = []) => steps.push({ title, body, items });
   add(
     "Print the two parts",
-    `Print the body and the front panel in ${p.design.material}${two ? ", each in its own colour" : ""}: ${l.outer.w} × ${l.outer.h} × ${l.outer.d} mm outside, ${l.wall} mm walls, 0.2 mm layers, 20% infill, no supports. The body prints open side up. The front panel prints face down, which gives it its smooth face.`,
+    `Print the body and the front panel in ${(p.design.finish ?? "chalk") === "chalk" ? "matte-grade " : ""}${MATERIAL[p.design.material]?.name ?? p.design.material}${two ? ", each in its own colour" : ""}${(p.design.finish ?? "chalk") === "chalk" ? ", which gives the chalk finish" : ""}: ${l.outer.w} × ${l.outer.h} × ${l.outer.d} mm outside, ${l.wall} mm walls, 0.2 mm layers, 20% infill, no supports. The body prints open side up. The front panel prints face down, which gives it its smooth face.`,
   );
   if (signal.length) add("Wire the modules to the controller", "Cut each wire about 20 mm longer than the gap it has to cross, so parts can be lifted out later. Solder one wire per row.", signal.map(row));
   if (power.length) add("Wire the power chain", "Do the battery last, and keep its two leads apart while you work.", power.map(row));

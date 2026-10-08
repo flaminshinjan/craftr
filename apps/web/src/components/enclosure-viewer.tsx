@@ -186,7 +186,12 @@ const POST_FIT = 0.15;
 const POST_WALL = 0.8;
 const LEDGE = 1.2;
 const CLIP_RISE = 1.25;
-const CLIP_REACH = 0.4;
+/**
+ * How far a clip may hook over a board. The post has to bend that far to let the board past, and a printed
+ * post of this thickness can only bend so much before it marks or cracks (about 1.5% strain), which goes with
+ * the square of its free height. Short posts therefore get a small hook, and very short ones get none.
+ */
+const clipReach = (free: number) => Math.min(0.4, ((2 / 3) * 0.015 * free * free) / POST_WALL);
 const STAND_TILT = (12 * Math.PI) / 180;
 
 /**
@@ -260,7 +265,8 @@ function fixtures(l: Layout) {
     // Clips go on one pair of opposite sides, so the board tilts in under one side and clicks past the other.
     const clipAxis = isRound ? "r" : chosen.some((q) => q.axis === "x" && q.nx > 0) && chosen.some((q) => q.axis === "x" && q.nx < 0) ? "x" : "y";
     for (const q of chosen) {
-      const clip = q.axis === clipAxis && top + CLIP_RISE <= cap && free(q, top + CLIP_RISE);
+      const hook = clipReach(sz + 0.25);
+      const clip = q.axis === clipAxis && hook >= 0.15 && top + CLIP_RISE <= cap && free(q, top + CLIP_RISE);
       const peak = clip ? top + CLIP_RISE : Math.min(top, cap);
       // Profiles are drawn in the plane of the post (outward distance, height) and swept along the edge.
       const sweep = (pts: [number, number][]) => {
@@ -273,7 +279,7 @@ function fixtures(l: Layout) {
       if (peak - bottom > 1) {
         const wall: [number, number][] = [[POST_FIT, Math.max(floor, bottom - 0.2)], [out, Math.max(floor, bottom - 0.2)], [out, peak], [POST_FIT, peak]];
         // The clip: a small hook over the board's edge, flat underneath and sloped on top so the board slides past.
-        guides.push(sweep(clip ? [...wall, [POST_FIT - CLIP_REACH, top + 0.25], [POST_FIT, top + 0.25]] : wall));
+        guides.push(sweep(clip ? [...wall, [POST_FIT - hook, top + 0.25], [POST_FIT, top + 0.25]] : wall));
       }
       held.add(p.nodeId);
     }
@@ -329,13 +335,16 @@ function buildShell(l: Layout, mat: THREE.Material) {
     const zb = -d / 2 + backEdge + 0.5;
     const zf = d / 2 - 1.5;
     const drop = (zf - zb) * Math.tan(STAND_TILT);
-    const span = Math.max(10, w - 2 * R - 2);
-    const g = new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(zb, -h / 2 + 0.4), new THREE.Vector2(zf, -h / 2 + 0.4), new THREE.Vector2(zf, -h / 2 - drop), new THREE.Vector2(zb, -h / 2)]), { depth: span, bevelEnabled: false });
-    g.rotateY(-Math.PI / 2);
-    g.translate(span / 2, 0, 0);
-    const foot = brush(g);
-    body = ev.evaluate(body, foot, ADDITION);
-    extra.push(foot);
+    const wideFoot = Math.max(6, Math.min(10, w * 0.14));
+    const reach = Math.max(wideFoot / 2, w / 2 - R - wideFoot / 2 - 1);
+    for (const side of reach > wideFoot ? [-1, 1] : [0]) {
+      const g = new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(zb, -h / 2 + 0.4), new THREE.Vector2(zf, -h / 2 + 0.4), new THREE.Vector2(zf, -h / 2 - drop), new THREE.Vector2(zb, -h / 2)]), { depth: wideFoot, bevelEnabled: false });
+      g.rotateY(-Math.PI / 2);
+      g.translate(side * reach + wideFoot / 2, 0, 0);
+      const foot = brush(g);
+      body = ev.evaluate(body, foot, ADDITION);
+      extra.push(foot);
+    }
   }
   // A thumbnail notch in the rim at the bottom, to lift the panel out again.
   const notch = brush(prism(outline(7, rim + 2, 0.6, 3), d / 2 - 1.2, d / 2 + 1).translate(0, -h / 2 + (rim + 2) / 2 - 1, 0));
@@ -543,7 +552,7 @@ interface Movable {
   away: THREE.Vector3;
 }
 
-export function EnclosureViewer({ layout, color, face, wires, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; /** Connections to draw between parts, by node id. Shown in the x-ray and exploded views. */ wires?: { from: string; to: string; color: string; pins: { a: string; b: string }[] }[]; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
+export function EnclosureViewer({ layout, color, face, finish = "chalk", wires, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; finish?: "chalk" | "smooth"; /** Connections to draw between parts, by node id. Shown in the x-ray and exploded views. */ wires?: { from: string; to: string; color: string; pins: { a: string; b: string }[] }[]; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
   const host = useRef<HTMLDivElement>(null);
   const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; wires: { mesh: THREE.Mesh; a: THREE.Object3D; b: THREE.Object3D; pa: THREE.Vector3; pb: THREE.Vector3; rise: number; key: string }[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
 
@@ -686,7 +695,7 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
   }, [interactive, spin]);
 
   // Rebuild the model whenever the design changes.
-  const sig = JSON.stringify([layout.shape, layout.stand, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face, wires]);
+  const sig = JSON.stringify([layout.shape, layout.stand, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face, finish, wires]);
   useEffect(() => {
     const s = stage.current;
     if (!s) return;
@@ -700,7 +709,14 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
       });
     }
     const { w, h, d } = layout.outer;
-    const skin = (tint: string) => new THREE.MeshStandardMaterial({ color: tint, roughness: 0.62, metalness: 0.02, transparent: true, opacity: s.mode === "xray" ? 0.3 : 1, side: THREE.DoubleSide });
+    // Chalk scatters light evenly and looks a touch paler; smooth keeps a soft highlight.
+    const chalk = finish === "chalk";
+    const paler = (tint: string) => {
+      const c = new THREE.Color(tint);
+      // Dark colours stay dark: a chalk black is still black, only flatter.
+      return c.lerp(new THREE.Color("#ffffff"), 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.25 ? 0.06 : 0.012);
+    };
+    const skin = (tint: string) => new THREE.MeshStandardMaterial({ color: chalk ? paler(tint) : tint, roughness: chalk ? 1 : 0.5, metalness: chalk ? 0 : 0.03, transparent: true, opacity: s.mode === "xray" ? 0.3 : 1, side: THREE.DoubleSide });
     const shellMat = skin(color);
     const faceMat = skin(face || color);
     let geos: ReturnType<typeof buildShell>;
@@ -751,14 +767,44 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
     }
     // One wire per pin, from a solder pad on one part to a pad on the other.
     const sizes = new Map(layout.placements.map((p) => [p.nodeId, p] as const));
+    // Pads sit where each kind of board really has its connections, on the usual 2.54 mm header pitch:
+    // a controller has a row down each long side, a breakout has one row along a long edge,
+    // and a battery has two leads coming off one end.
+    const PITCH = 2.54;
+    const seen = new Map<string, string[]>();
     const pad = (nodeId: string, pin: string) => {
       const p = sizes.get(nodeId)!;
-      const pins = getBlock(p.blockId)?.pins ?? [];
-      const found = pins.findIndex((x) => x.name === pin);
-      const slots = Math.max(pins.length, 6);
-      const slot = found >= 0 ? found : [...pin].reduce((n, ch) => n + ch.charCodeAt(0), 0) % slots;
-      const at = new THREE.Vector3(-p.size[0] / 2 + ((slot + 0.5) / slots) * p.size[0], p.size[1] / 2 - 1.3, -p.size[2] / 2 + Math.min(1.6, p.size[2] * 0.5) + 0.15);
-      const dot = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 0.3), std("#d8b24a", 0.35, 0.8));
+      const block = getBlock(p.blockId);
+      const [sx, sy, sz] = p.size;
+      const known = block?.pins.map((x) => x.name) ?? [];
+      // Controller pins that are not in the short pin list (most GPIOs) take the next free place in order of use.
+      const extra = seen.get(nodeId) ?? [];
+      if (!known.includes(pin) && !extra.includes(pin)) seen.set(nodeId, [...extra, pin]);
+      const all = [...known, ...(seen.get(nodeId) ?? [])];
+      const i = all.indexOf(pin);
+      const long = sx >= sy ? "x" : "y";
+      const along = Math.max(sx, sy);
+      const across = Math.min(sx, sy);
+      const z = -sz / 2 + Math.min(1.6, sz * 0.5) + 0.15;
+      let u = 0;
+      let v = 0;
+      if (block?.tags.includes("battery")) {
+        u = -along / 2 + 1;
+        v = (i - 0.5) * 3;
+      } else if (block?.iface === "mcu") {
+        // Two rows: even pins down one side, odd pins down the other.
+        const perRow = Math.max(1, Math.floor((along - 3) / PITCH));
+        const k = Math.floor(i / 2) % perRow;
+        u = -((Math.min(perRow, Math.ceil(all.length / 2)) - 1) * PITCH) / 2 + k * PITCH;
+        v = (i % 2 ? -1 : 1) * (across / 2 - 1.3);
+      } else {
+        const fit = Math.max(1, Math.floor((along - 2) / PITCH));
+        const step = all.length > fit ? (along - 3) / Math.max(1, all.length - 1) : PITCH;
+        u = -((all.length - 1) * step) / 2 + i * step;
+        v = across / 2 - 1.3;
+      }
+      const at = long === "x" ? new THREE.Vector3(u, v, z) : new THREE.Vector3(v, u, z);
+      const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 12).rotateX(Math.PI / 2), std("#d8b24a", 0.35, 0.8));
       dot.position.copy(at);
       byNode.get(nodeId)!.add(dot);
       return at;
