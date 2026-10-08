@@ -6,7 +6,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { ADDITION, Brush, Evaluator, INTERSECTION, SUBTRACTION } from "three-bvh-csg";
+import { mergeGeometries, toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { ADDITION, Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 
 export type ViewMode = "solid" | "xray" | "exploded";
 export interface ViewerHandle {
@@ -19,22 +20,69 @@ export interface ViewerHandle {
 const LIP_DEPTH = 3;
 const LIP_THICK = 1;
 const LIP_FIT = 0.2;
+/** The front panel sits this far below the rim around it, which draws a fine shadow line. */
+export const FACE_RECESS = 0.3;
+const FACE_FIT = 0.15;
 
-function roundedRect(w: number, h: number, r: number) {
-  const s = new THREE.Shape();
-  const x = -w / 2;
-  const y = -h / 2;
-  const rr = Math.max(0.1, Math.min(r, w / 2 - 0.05, h / 2 - 0.05));
-  s.moveTo(x + rr, y);
-  s.lineTo(x + w - rr, y);
-  s.quadraticCurveTo(x + w, y, x + w, y + rr);
-  s.lineTo(x + w, y + h - rr);
-  s.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
-  s.lineTo(x + rr, y + h);
-  s.quadraticCurveTo(x, y + h, x, y + h - rr);
-  s.lineTo(x, y + rr);
-  s.quadraticCurveTo(x, y, x + rr, y);
-  return s;
+/** A rounded rectangle as a closed loop of points, counter-clockwise. With r at half the width it is a circle. */
+function outline(w: number, h: number, r: number, seg = 12): THREE.Vector2[] {
+  const rr = Math.max(0.05, Math.min(r, w / 2, h / 2));
+  const pts: THREE.Vector2[] = [];
+  const corners = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+  corners.forEach(([sx, sy], i) => {
+    // Sample between the tangent points, so two corners never share a point when the sides vanish.
+    for (let k = 0; k < seg; k++) {
+      const a = (i + (k + 0.5) / seg) * (Math.PI / 2);
+      pts.push(new THREE.Vector2(sx * (w / 2 - rr) + Math.cos(a) * rr, sy * (h / 2 - rr) + Math.sin(a) * rr));
+    }
+  });
+  return pts;
+}
+
+/** A straight-sided solid with the given outline, from z0 to z1. */
+function prism(pts: THREE.Vector2[], z0: number, z1: number, hole?: THREE.Vector2[]) {
+  const shape = new THREE.Shape(pts);
+  if (hole) shape.holes.push(new THREE.Path(hole));
+  const g = new THREE.ExtrudeGeometry(shape, { depth: z1 - z0, bevelEnabled: false });
+  g.translate(0, 0, z0);
+  return g;
+}
+
+/**
+ * The outside of the body: the outline swept from back to front, with a soft rounded back edge
+ * and a crisp little chamfer at the front. Each section is the outline pulled in by `inset`.
+ */
+function hull(w: number, h: number, r: number, d: number, back: number, front: number, seg: number) {
+  const sections: { z: number; inset: number }[] = [];
+  const steps = 7;
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * (Math.PI / 2);
+    sections.push({ z: -d / 2 + back * (1 - Math.cos(a)), inset: back * (1 - Math.sin(a)) });
+  }
+  sections.push({ z: d / 2 - front, inset: 0 }, { z: d / 2, inset: front });
+  const rings = sections.map((s) => outline(w - 2 * s.inset, h - 2 * s.inset, r - s.inset, seg));
+  const n = rings[0].length;
+  const pos: number[] = [];
+  rings.forEach((ring, i) => ring.forEach((p) => pos.push(p.x, p.y, sections[i].z)));
+  const idx: number[] = [];
+  for (let s = 0; s < rings.length - 1; s++) {
+    for (let i = 0; i < n; i++) {
+      const a = s * n + i;
+      const b = s * n + ((i + 1) % n);
+      idx.push(a, b, a + n, b, b + n, a + n);
+    }
+  }
+  const backC = pos.length / 3;
+  pos.push(0, 0, -d / 2, 0, 0, d / 2);
+  const last = (rings.length - 1) * n;
+  for (let i = 0; i < n; i++) {
+    idx.push(backC, (i + 1) % n, i);
+    idx.push(backC + 1, last + i, last + ((i + 1) % n));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return toCreasedNormals(g, Math.PI / 5);
 }
 
 function cutoutBrush(c: PlacedCutout, l: Layout, mat: THREE.Material) {
@@ -43,12 +91,35 @@ function cutoutBrush(c: PlacedCutout, l: Layout, mat: THREE.Material) {
   const side = c.face === "left" || c.face === "right";
   const cap = c.face === "top" || c.face === "bottom";
   let geo: THREE.BufferGeometry;
-  if (c.shape === "circle") {
-    geo = new THREE.CylinderGeometry(c.w / 2, c.w / 2, len, 28);
+  if (c.shape === "circle" && c.grille) {
+    // A field of small holes on a hex grid instead of one big opening.
+    const pitch = 2.6;
+    const holes: THREE.BufferGeometry[] = [];
+    for (let row = -8; row <= 8; row++) {
+      for (let col = -8; col <= 8; col++) {
+        const x = (col + (row % 2 ? 0.5 : 0)) * pitch;
+        const y = row * pitch * 0.866;
+        if (Math.hypot(x, y) > c.w / 2 - 0.7) continue;
+        const hole = new THREE.CylinderGeometry(0.75, 0.75, len, 12);
+        hole.translate(x, 0, -y);
+        holes.push(hole);
+      }
+    }
+    geo = mergeGeometries(holes)!;
+    holes.forEach((g) => g.dispose());
+    if (side) geo.rotateZ(Math.PI / 2);
+    else if (!cap) geo.rotateX(Math.PI / 2);
+  } else if (c.shape === "circle") {
+    geo = new THREE.CylinderGeometry(c.w / 2, c.w / 2, len, 40);
     if (side) geo.rotateZ(Math.PI / 2);
     else if (!cap) geo.rotateX(Math.PI / 2);
   } else {
-    geo = side ? new THREE.BoxGeometry(len, c.h, c.w) : cap ? new THREE.BoxGeometry(c.w, len, c.h) : new THREE.BoxGeometry(c.w, c.h, len);
+    // Rounded corners on every opening; a port in a side wall becomes a full stadium.
+    const r = side ? Math.min(c.w, c.h) / 2 - 0.05 : Math.min(1.2, Math.min(c.w, c.h) / 2 - 0.05);
+    // A board lies flat against the back, so a port in a side wall is tall and thin: its width runs up the wall.
+    geo = prism(side ? outline(c.h, c.w, r, 6) : outline(c.w, c.h, r, 6), -len / 2, len / 2);
+    if (side) geo.rotateY(Math.PI / 2);
+    else if (cap) geo.rotateX(Math.PI / 2);
   }
   const b = new Brush(geo, mat);
   const t = l.wall / 2;
@@ -64,51 +135,51 @@ function cutoutBrush(c: PlacedCutout, l: Layout, mat: THREE.Material) {
 
 const disc = (r: number) => new THREE.Shape().absarc(0, 0, r, 0, Math.PI * 2, false);
 
-/** A disc lying in the XY plane, centred, with softened edges. */
-function puck(r: number, depth: number, fillet: number) {
-  const f = Math.max(0, Math.min(fillet, r - 0.5, depth / 2 - 0.1));
-  const g = new THREE.ExtrudeGeometry(disc(r - f), { depth: depth - 2 * f, bevelEnabled: f > 0, bevelThickness: f, bevelSize: f, bevelSegments: 5, curveSegments: 48 });
-  g.translate(0, 0, -(depth - 2 * f) / 2);
-  return g;
-}
-
-/** Builds the printable shell from the compiled layout: hollow body, openings cut, split into body and lid. */
+/**
+ * Builds the printable shell from the compiled layout. The body is a tub: back and side walls in one piece.
+ * The front is a flat panel that drops into a rebate in the rim, so the only seam is a fine line on the face,
+ * and the panel prints face-down for a clean surface.
+ */
 function buildShell(l: Layout, mat: THREE.Material) {
   const { w, h, d } = l.outer;
   const t = l.wall;
   const round = l.shape === "round";
+  const seg = round ? 18 : 12;
   const ev = new Evaluator();
   ev.attributes = ["position", "normal"];
-  const cw = Math.max(1, w - 2 * t);
-  const ch = Math.max(1, h - 2 * t);
-  const cd = Math.max(1, d - 2 * t);
-  const outer = new Brush(round ? puck(w / 2, d, l.radius) : new RoundedBoxGeometry(w, h, d, 5, l.radius), mat);
-  const cavity = new Brush(round ? puck(cw / 2, cd, 0) : new RoundedBoxGeometry(cw, ch, cd, 4, Math.max(0.4, Math.min(l.radius - t, cw / 2 - 0.1, ch / 2 - 0.1, cd / 2 - 0.1))), mat);
-  outer.updateMatrixWorld();
-  cavity.updateMatrixWorld();
-  let shell = ev.evaluate(outer, cavity, SUBTRACTION);
+  const R = round ? w / 2 : l.radius;
+  const brush = (g: THREE.BufferGeometry) => {
+    const b = new Brush(g, mat);
+    b.updateMatrixWorld();
+    return b;
+  };
+  // Keep the inside corners tight enough that a board placed in a corner still clears them.
+  const innerR = round ? R - t : Math.max(0.6, Math.min(R - t, l.clearance * 3.4));
+  const rim = Math.max(0.8, t * 0.45);
+  const backEdge = Math.min(round ? l.radius : 3, d / 5, R * 0.6);
+  const cavityLine = outline(w - 2 * t, h - 2 * t, innerR, seg);
+  const seatLine = outline(w - 2 * rim, h - 2 * rim, R - rim, seg);
+
+  const outer = brush(hull(w, h, R, d, backEdge, 0.4, seg));
+  const cavity = brush(prism(cavityLine, -d / 2 + t, d / 2 + 1));
+  const seat = brush(prism(seatLine, d / 2 - t, d / 2 + 1));
+  let body = ev.evaluate(ev.evaluate(outer, cavity, SUBTRACTION), seat, SUBTRACTION);
   const cuts = l.cutouts.map((c) => cutoutBrush(c, l, mat));
-  for (const c of cuts) shell = ev.evaluate(shell, c, SUBTRACTION);
+  for (const c of cuts) body = ev.evaluate(body, c, SUBTRACTION);
 
-  const slab = new Brush(new THREE.BoxGeometry(w + 10, h + 10, t + 10), mat);
-  slab.position.z = d / 2 - t + (t + 10) / 2;
-  slab.updateMatrixWorld();
-  const body = ev.evaluate(shell, slab, SUBTRACTION);
-  let lid = ev.evaluate(shell, slab, INTERSECTION);
-
-  // A friction-fit lip so the lid seats in the body.
-  const lw = cw - 2 * LIP_FIT;
-  const lh = ch - 2 * LIP_FIT;
-  if (lw > 8 && lh > 8 && cd > LIP_DEPTH + 1) {
-    const ring = round ? disc(lw / 2) : roundedRect(lw, lh, Math.max(0.4, l.radius - t));
-    ring.holes.push(round ? disc(lw / 2 - LIP_THICK) : roundedRect(lw - 2 * LIP_THICK, lh - 2 * LIP_THICK, Math.max(0.3, l.radius - t - LIP_THICK)));
-    const lip = new Brush(new THREE.ExtrudeGeometry(ring, { depth: LIP_DEPTH + 0.2, bevelEnabled: false, curveSegments: round ? 48 : 6 }), mat);
-    lip.position.z = d / 2 - t - LIP_DEPTH;
-    lip.updateMatrixWorld();
+  const plate = brush(prism(outline(w - 2 * rim - 2 * FACE_FIT, h - 2 * rim - 2 * FACE_FIT, R - rim - FACE_FIT, seg), d / 2 - t, d / 2 - FACE_RECESS));
+  let lid: Brush = plate;
+  // A friction-fit lip so the panel seats in the body.
+  const lw = w - 2 * t - 2 * LIP_FIT;
+  const lh = h - 2 * t - 2 * LIP_FIT;
+  const extra: Brush[] = [];
+  if (lw > 8 && lh > 8 && d - 2 * t > LIP_DEPTH + 1) {
+    const lip = brush(prism(outline(lw, lh, innerR - LIP_FIT, seg), d / 2 - t - LIP_DEPTH, d / 2 - t + 0.2, outline(lw - 2 * LIP_THICK, lh - 2 * LIP_THICK, Math.max(0.3, innerR - LIP_FIT - LIP_THICK), seg).reverse()));
+    extra.push(lip);
     lid = ev.evaluate(lid, lip, ADDITION);
-    for (const c of cuts) lid = ev.evaluate(lid, c, SUBTRACTION);
   }
-  // The card pocket: a shallow sleeve on the outside of the front cover, open at the top, with a thumb notch.
+  for (const c of cuts) lid = ev.evaluate(lid, c, SUBTRACTION);
+  // The card pocket: a shallow sleeve on the outside of the front panel, open at the top, with a thumb notch.
   if (l.pocket) {
     const k = l.pocket;
     const place = (g: THREE.BufferGeometry, x: number, y: number, z: number) => {
@@ -126,9 +197,9 @@ function buildShell(l: Layout, mat: THREE.Material) {
     lid = ev.evaluate(lid, sleeve, ADDITION);
     lid = ev.evaluate(lid, slot, SUBTRACTION);
     lid = ev.evaluate(lid, notch, SUBTRACTION);
-    for (const b of [sleeve, slot, notch]) b.geometry.dispose();
+    extra.push(sleeve, slot, notch);
   }
-  for (const b of [outer, cavity, slab, ...cuts]) b.geometry.dispose();
+  for (const b of [outer, cavity, seat, plate, ...extra, ...cuts]) b.geometry.dispose();
   return { body: body.geometry, lid: lid.geometry };
 }
 
@@ -255,9 +326,9 @@ interface Movable {
   away: THREE.Vector3;
 }
 
-export function EnclosureViewer({ layout, color, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
+export function EnclosureViewer({ layout, color, face, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
   const host = useRef<HTMLDivElement>(null);
-  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shell: THREE.MeshStandardMaterial | null; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
+  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
     exportStl: () => {
@@ -278,10 +349,10 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
       const s = stage.current;
       if (!s?.geos) return null;
       const { renderer, scene, camera, controls } = s;
-      const keep = { pos: camera.position.clone(), aspect: camera.aspect, bg: scene.background, opacity: s.shell?.opacity ?? 1, size: renderer.getSize(new THREE.Vector2()), ratio: renderer.getPixelRatio(), places: s.movers.map((m) => m.obj.position.clone()) };
+      const keep = { pos: camera.position.clone(), aspect: camera.aspect, bg: scene.background, opacity: s.shells[0]?.opacity ?? 1, size: renderer.getSize(new THREE.Vector2()), ratio: renderer.getPixelRatio(), places: s.movers.map((m) => m.obj.position.clone()) };
       // Assembled, opaque, from a fixed front three-quarter angle, so every picture is framed the same way.
       s.movers.forEach((m) => m.obj.position.copy(m.home));
-      if (s.shell) s.shell.opacity = 1;
+      s.shells.forEach((m) => (m.opacity = 1));
       scene.background = new THREE.Color("#ece7df");
       renderer.setPixelRatio(1);
       renderer.setSize(size, size, false);
@@ -293,7 +364,7 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
       renderer.render(scene, camera);
       const url = renderer.domElement.toDataURL("image/png");
       scene.background = keep.bg;
-      if (s.shell) s.shell.opacity = keep.opacity;
+      s.shells.forEach((m) => (m.opacity = keep.opacity));
       s.movers.forEach((m, i) => m.obj.position.copy(keep.places[i]));
       renderer.setPixelRatio(keep.ratio);
       renderer.setSize(keep.size.x, keep.size.y, false);
@@ -334,7 +405,7 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
     controls.enabled = interactive;
     controls.autoRotate = spin && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     controls.autoRotateSpeed = 1.2;
-    stage.current = { renderer, scene, camera, controls, model, movers: [], shell: null, geos: null, mode: "solid", dist: 200, span: 0 };
+    stage.current = { renderer, scene, camera, controls, model, movers: [], shells: [], geos: null, mode: "solid", dist: 200, span: 0 };
 
     const size = () => {
       const { clientWidth: w, clientHeight: h } = el;
@@ -356,14 +427,14 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
       if (!s || document.hidden) return;
       const exploded = s.mode === "exploded";
       for (const m of s.movers) m.obj.position.lerp(exploded ? m.away : m.home, 0.12);
-      if (s.shell) {
-        s.shell.opacity += ((s.mode === "xray" ? 0.3 : 1) - s.shell.opacity) * 0.15;
+      for (const m of s.shells) {
+        m.opacity += ((s.mode === "xray" ? 0.3 : 1) - m.opacity) * 0.15;
         // A see-through shell must not write depth or draw its inner faces, or its own triangles show through.
-        const clear = s.shell.opacity < 0.97;
-        if (s.shell.depthWrite === clear) {
-          s.shell.depthWrite = !clear;
-          s.shell.side = clear ? THREE.FrontSide : THREE.DoubleSide;
-          s.shell.needsUpdate = true;
+        const clear = m.opacity < 0.97;
+        if (m.depthWrite === clear) {
+          m.depthWrite = !clear;
+          m.side = clear ? THREE.FrontSide : THREE.DoubleSide;
+          m.needsUpdate = true;
         }
       }
       s.controls.target.z += ((exploded ? s.span / 2 : 0) - s.controls.target.z) * 0.12;
@@ -383,7 +454,7 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
   }, [interactive, spin]);
 
   // Rebuild the model whenever the design changes.
-  const sig = JSON.stringify([layout.shape, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color]);
+  const sig = JSON.stringify([layout.shape, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face]);
   useEffect(() => {
     const s = stage.current;
     if (!s) return;
@@ -397,7 +468,9 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
       });
     }
     const { w, h, d } = layout.outer;
-    const shellMat = new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0.02, transparent: true, opacity: s.mode === "xray" ? 0.3 : 1, side: THREE.DoubleSide });
+    const skin = (tint: string) => new THREE.MeshStandardMaterial({ color: tint, roughness: 0.62, metalness: 0.02, transparent: true, opacity: s.mode === "xray" ? 0.3 : 1, side: THREE.DoubleSide });
+    const shellMat = skin(color);
+    const faceMat = skin(face || color);
     let geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry };
     try {
       geos = buildShell(layout, shellMat);
@@ -414,14 +487,14 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
       if (s.mode === "exploded") obj.position.z += offsetZ;
     };
     add(new THREE.Mesh(geos.body, shellMat), 0);
-    add(new THREE.Mesh(geos.lid, shellMat), step * 5);
+    add(new THREE.Mesh(geos.lid, faceMat), step * 5);
 
     const order = { back: 1, power: 2, logic: 3, front: 4, external: 0 } as const;
-    const c = new THREE.Color(color);
+    const c = new THREE.Color(face || color);
     const lightShell = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.25;
     for (const p of layout.placements) {
       // Distance from the part's outward face to the outside of the wall it looks through.
-      const reach = p.layer === "front" ? d / 2 - (p.pos[2] + p.size[2] / 2) : p.layer === "back" ? d / 2 + (p.pos[2] - p.size[2] / 2) : 0;
+      const reach = p.layer === "front" ? d / 2 - FACE_RECESS - (p.pos[2] + p.size[2] / 2) : p.layer === "back" ? d / 2 + (p.pos[2] - p.size[2] / 2) : 0;
       const part = partObject(p.blockId, p.size, reach, lightShell);
       part.position.set(...p.pos);
       if (p.layer === "back") part.rotation.y = Math.PI;
@@ -448,7 +521,7 @@ export function EnclosureViewer({ layout, color, mode = "solid", spin = false, i
 
     s.span = step * 5;
     s.movers = movers;
-    s.shell = shellMat;
+    s.shells = [shellMat, faceMat];
     s.geos = geos;
     // Cards stand above the body, so the frame has to make room for them.
     const high = layout.pocket ? layout.pocket.y - layout.pocket.h / 2 + 1.6 + 85.6 + 6 : h / 2;

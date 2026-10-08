@@ -23,6 +23,8 @@ export interface Cutout {
   shape: "rect" | "circle";
   w: number;
   h: number;
+  /** A circle drawn as a field of small holes, for sound to pass through. */
+  grille?: boolean;
 }
 
 export interface MicroPythonDriver {
@@ -115,6 +117,8 @@ export interface DesignConfig {
   style: EnclosureStyle;
   material: Material;
   color: string;
+  /** Colour of the front panel, which is printed as its own part. Left out, it matches the body. */
+  face?: string;
   /** When true the outer size follows the components; when false the user's numbers are used. */
   auto: boolean;
   width: number;
@@ -162,6 +166,7 @@ export interface PlacedCutout {
   shape: "rect" | "circle";
   w: number;
   h: number;
+  grille?: boolean;
   /** Position on the face, centred origin. u is horizontal, v is vertical (or depth for top/bottom). */
   u: number;
   v: number;

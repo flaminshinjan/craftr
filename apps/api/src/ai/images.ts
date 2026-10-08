@@ -31,6 +31,7 @@ export function decodeReference(dataUrl: unknown): Buffer | undefined {
 }
 
 const COLOR_NAME: Record<string, string> = { "#F2EBDD": "warm cream", "#5FA052": "leaf green", "#D9B98E": "soft tan", "#C9C9C6": "light grey", "#3F4043": "charcoal" };
+const FACE_NAME: Record<string, string> = { "#1B1B1A": "matte black", "#F7F4EE": "off-white" };
 const STYLE_LOOK = { minimal: "clean, with soft rounded edges", rugged: "sturdy, with thick walls", compact: "slim and tight-fitting" };
 
 /** Describes what is visible on the outside, from the real layout, so the picture matches the design. */
@@ -67,7 +68,7 @@ export function renderPrompt(p: { name: string; description: string; nodes: Proj
   return `${hasReference ? "The attached image is a plain CAD preview of a real device. Redraw it as a photorealistic studio product photograph of that same object. Keep its exact shape, proportions and viewing angle, and keep every opening, button, screen and port exactly where the preview shows it. Do not add, remove, enlarge or move any feature." : "A photorealistic studio product photograph of a small electronic device, seen from a front three-quarter angle."}
 
 The device: "${p.name}". ${p.description}
-It is ${form}: a 3D-printed enclosure in matte ${colour} ${p.design.material} plastic${hasReference ? ", whatever colour the preview uses" : ""}, ${STYLE_LOOK[p.design.style]}, with the fine, slightly grainy surface of a good-quality print and a thin seam where the front cover meets the body. It is small enough to sit in a hand.
+It is ${form}: a 3D-printed enclosure in matte ${colour} ${p.design.material} plastic${hasReference ? ", whatever colour the preview uses" : ""}, ${STYLE_LOOK[p.design.style]}, with the fine, slightly grainy surface of a good-quality print. The front is a flat panel${p.design.face ? ` in ${COLOR_NAME[p.design.face] ?? FACE_NAME[p.design.face.toUpperCase()] ?? `colour ${p.design.face}`}` : ""} set into the body, with a hairline gap around it. It is small enough to sit in a hand.
 Visible details: ${[pocket ? `a shallow card pocket moulded onto the front face with a thumb notch at the top, holding ${pocket.cards} bank card${pocket.cards > 1 ? "s" : ""} that stick out above it` : "", exterior(p.nodes, p.compiled)].filter(Boolean).join("; ") || "clean, plain faces"}.
 
 Shot on a seamless warm off-white backdrop with soft, diffused studio light and a gentle natural shadow underneath. Realistic materials and scale, sharp focus on the device. Nothing else in the frame: no props, no hands, no text, no logos, no labels.`;

@@ -127,6 +127,11 @@ function patchDesign(cur: DesignConfig, patch: Partial<Record<keyof DesignConfig
   if (typeof patch.style === "string" && patch.style in STYLE) d.style = patch.style as DesignConfig["style"];
   if (typeof patch.material === "string" && patch.material in MATERIAL) d.material = patch.material as DesignConfig["material"];
   if (typeof patch.color === "string" && /^#[0-9a-fA-F]{6}$/.test(patch.color)) d.color = patch.color;
+  const face = patch.face ?? (patch as { face_color?: unknown }).face_color;
+  if (typeof face === "string") {
+    if (/^#[0-9a-fA-F]{6}$/.test(face) && face.toLowerCase() !== d.color.toLowerCase()) d.face = face;
+    else delete d.face;
+  }
   if (typeof patch.auto === "boolean") d.auto = patch.auto;
   for (const k of ["width", "height", "depth"] as const) {
     const v = Number(patch[k]);

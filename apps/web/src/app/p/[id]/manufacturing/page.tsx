@@ -81,7 +81,7 @@ function Manufacturing({ p }: { p: Project }) {
               <img src={assetUrl(p.previewAssetId)} alt={`Render of ${p.name}`} className="size-full object-cover" />
             ) : null}
             {/* Kept mounted (hidden behind the render when there is one) so the STL can be exported. */}
-            <EnclosureViewer ref={viewer} layout={layout} color={p.design.color} spin className={clsx("absolute inset-0", p.previewAssetId && "pointer-events-none opacity-0")} />
+            <EnclosureViewer ref={viewer} layout={layout} color={p.design.color} face={p.design.face} spin className={clsx("absolute inset-0", p.previewAssetId && "pointer-events-none opacity-0")} />
           </div>
           <h2 className="mt-5 text-[26px] font-semibold">{p.name}</h2>
           <p className="mt-1 text-[16px] text-ink-3">{p.description}</p>

@@ -556,7 +556,7 @@ export const BLOCKS: BlockDef[] = [
     size: { w: 28, d: 28, h: 9 },
     round: true,
     mount: "back",
-    cutout: { shape: "circle", w: 14, h: 14 },
+    cutout: { shape: "circle", w: 20, h: 20, grille: true },
     iface: "i2s_out",
     signals: ["BCLK", "WS", "DIN"],
     voltage: { min: 3.0, max: 5.5 },

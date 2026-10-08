@@ -278,7 +278,7 @@ function PreviewCard({ p, generating }: { p: Project; generating: boolean }) {
         ) : tab === "preview" ? (
           <>
             {/* Always mounted: it is the stand-in while there is no picture, and the source of the snapshot. */}
-            <EnclosureViewer ref={viewer} layout={p.compiled.layout} color={p.design.color} spin={!p.previewAssetId} interactive={!p.previewAssetId} className={clsx("absolute inset-0", p.previewAssetId && "pointer-events-none opacity-0")} />
+            <EnclosureViewer ref={viewer} layout={p.compiled.layout} color={p.design.color} face={p.design.face} spin={!p.previewAssetId} interactive={!p.previewAssetId} className={clsx("absolute inset-0", p.previewAssetId && "pointer-events-none opacity-0")} />
             {p.previewAssetId && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={assetUrl(p.previewAssetId)} alt={`Photo-style render of ${p.name}`} className={clsx("relative size-full object-cover transition-opacity", busy && "opacity-50")} />
@@ -298,7 +298,7 @@ function PreviewCard({ p, generating }: { p: Project; generating: boolean }) {
           </>
         ) : tab === "model" ? (
           <>
-            <EnclosureViewer layout={p.compiled.layout} color={p.design.color} mode="xray" className="size-full" />
+            <EnclosureViewer layout={p.compiled.layout} color={p.design.color} face={p.design.face} mode="xray" className="size-full" />
             <span className="absolute bottom-3 left-3 rounded-full bg-card/90 px-3 py-1.5 text-[12.5px] text-ink-2">
               {p.compiled.layout.outer.w} × {p.compiled.layout.outer.h} × {p.compiled.layout.outer.d} mm · drag to rotate
             </span>

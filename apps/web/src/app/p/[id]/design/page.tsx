@@ -155,6 +155,16 @@ function Design({ p }: { p: Project }) {
               ))}
             </div>
           </Group>
+          <Group label="Front panel">
+            <div className="flex gap-4">
+              {[undefined, "#1B1B1A", "#F7F4EE", ...COLORS.filter((c) => c !== design.color)].map((c) => (
+                <button key={c ?? "match"} onClick={() => set({ face: c ?? "" })} aria-label={c ? `Front panel ${c}` : "Same as the body"} aria-pressed={(design.face || undefined) === c} title={c ? undefined : "Same as the body"} className={clsx("size-12 rounded-full border-2 p-1 transition", (design.face || undefined) === c ? "border-tan" : "border-transparent")}>
+                  <span className="block size-full rounded-full border border-black/10" style={{ background: c ?? design.color }} />
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[13px] text-ink-3">The front panel prints as its own part, so it can be a second colour.</p>
+          </Group>
           <Group
             label="Dimensions"
             right={
@@ -190,7 +200,7 @@ function Design({ p }: { p: Project }) {
         </div>
 
         <div className="relative min-h-[420px] overflow-hidden rounded-3xl bg-sand/70 lg:min-h-[640px]">
-          <EnclosureViewer ref={viewer} layout={layout} color={design.color} mode={mode} className="absolute inset-0" />
+          <EnclosureViewer ref={viewer} layout={layout} color={design.color} face={design.face} mode={mode} className="absolute inset-0" />
           <span className="absolute bottom-4 left-4 rounded-full bg-card/90 px-3 py-1.5 text-[12.5px] text-ink-2">
             {round ? `⌀${layout.outer.w} × ${layout.outer.d}` : `${layout.outer.w} × ${layout.outer.h} × ${layout.outer.d}`} mm · drag to rotate, scroll to zoom
           </span>
