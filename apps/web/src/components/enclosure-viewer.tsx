@@ -135,6 +135,53 @@ function cutoutBrush(c: PlacedCutout, l: Layout, mat: THREE.Material) {
 
 const disc = (r: number) => new THREE.Shape().absarc(0, 0, r, 0, Math.PI * 2, false);
 
+/** The Craftr sunflower as flat pixel blocks, in units where the whole mark is LOGO.h tall and centred on the origin. */
+const LOGO = { w: 3.5, h: 4.75, mid: -0.625 };
+function logoShapes(u: number): THREE.Shape[] {
+  const sq = (cx: number, cy: number, size: number) => new THREE.Shape([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => new THREE.Vector2((cx + (x * size) / 2) * u, (cy + (y * size) / 2 - LOGO.mid) * u)));
+  const petals = [sq(0, 0, 0.9), sq(0, 1.25, 1), sq(0, -1.25, 1), sq(1.25, 0, 1), sq(-1.25, 0, 1), sq(0.95, 0.95, 0.8), sq(-0.95, 0.95, 0.8), sq(0.95, -0.95, 0.8), sq(-0.95, -0.95, 0.8)];
+  // Stem and both leaves as one outline, so the blocks never overlap.
+  const half: [number, number][] = [[0.2, -1.9], [0.2, -2.25], [0.8, -2.25], [0.8, -1.95], [1.6, -1.95], [1.6, -2.4], [1.2, -2.4], [1.2, -2.7], [0.2, -2.7], [0.2, -3]];
+  const stem = [...half, ...half.map(([x, y]) => [-x, y] as [number, number]).reverse()];
+  return [...petals, new THREE.Shape(stem.map(([x, y]) => new THREE.Vector2(x * u, (y - LOGO.mid) * u)))];
+}
+
+type Box2 = { x: number; y: number; w: number; h: number };
+const overlaps = (a: Box2, b: Box2, pad = 1.5) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + pad && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + pad;
+
+/** Where the engraved logo goes on a face: the first free spot that clears every opening, or nowhere. */
+function logoSpot(l: Layout, face: "front" | "back"): Box2 | null {
+  const { w, h } = l.outer;
+  const round = l.shape === "round";
+  const small = Math.min(w, h);
+  const tall = face === "front" ? Math.min(14, Math.max(8, small * 0.2)) : Math.min(22, Math.max(9, small * 0.3));
+  const size = { w: (tall / LOGO.h) * LOGO.w, h: tall };
+  const taken: Box2[] = l.cutouts.filter((c) => c.face === face).map((c) => ({ x: c.u, y: c.v, w: c.w, h: c.shape === "circle" ? c.w : c.h }));
+  if (face === "front") {
+    // Parts that shine or sense through the panel without an opening still need their patch of wall left alone.
+    for (const p of l.placements) if (p.layer === "front" && !l.cutouts.some((c) => c.nodeId === p.nodeId)) taken.push({ x: p.pos[0], y: p.pos[1], w: p.size[0], h: p.size[1] });
+    if (l.pocket) taken.push({ x: 0, y: l.pocket.y, w: l.pocket.w, h: l.pocket.h });
+  }
+  const edge = l.wall + 3;
+  const dx = w / 2 - edge - size.w / 2;
+  const dy = h / 2 - edge - size.h / 2;
+  const spots: [number, number][] = face === "back" ? [[0, 0], [0, -dy], [0, dy]] : round ? [[0, -dy + 1], [0, dy - 1]] : [[0, -dy], [dx, -dy], [-dx, -dy], [0, dy], [dx, dy], [-dx, dy]];
+  for (const [x, y] of spots) {
+    const spot = { x, y, ...size };
+    if (dx >= 0 && dy >= 0 && !taken.some((t) => overlaps(spot, t))) return spot;
+  }
+  return null;
+}
+
+/** A brush that sinks the logo into a face whose outside surface is at `z`. */
+function logoBrush(spot: Box2, z: number, depth: number, mat: THREE.Material) {
+  const g = new THREE.ExtrudeGeometry(logoShapes(spot.h / LOGO.h), { depth: depth * 2, bevelEnabled: false });
+  g.translate(spot.x, spot.y, z - depth);
+  const b = new Brush(g, mat);
+  b.updateMatrixWorld();
+  return b;
+}
+
 /**
  * Builds the printable shell from the compiled layout. The body is a tub: back and side walls in one piece.
  * The front is a flat panel that drops into a rebate in the rim, so the only seam is a fine line on the face,
@@ -199,8 +246,24 @@ function buildShell(l: Layout, mat: THREE.Material) {
     lid = ev.evaluate(lid, notch, SUBTRACTION);
     extra.push(sleeve, slot, notch);
   }
+  // The Craftr mark, sunk into the back and into a free corner of the front panel.
+  const deep = Math.min(0.5, t * 0.3);
+  const onBack = logoSpot(l, "back");
+  const onFront = logoSpot(l, "front");
+  if (onBack) {
+    const b = logoBrush(onBack, -d / 2, deep, mat);
+    body = ev.evaluate(body, b, SUBTRACTION);
+    extra.push(b);
+  }
+  if (onFront) {
+    const b = logoBrush(onFront, d / 2 - FACE_RECESS, deep, mat);
+    lid = ev.evaluate(lid, b, SUBTRACTION);
+    extra.push(b);
+  }
   for (const b of [outer, cavity, seat, plate, ...extra, ...cuts]) b.geometry.dispose();
-  return { body: body.geometry, lid: lid.geometry };
+  // The floor of each engraving, so the viewer can shade it the way a recess catches less light.
+  const marks = [onBack && { spot: onBack, z: -d / 2 + deep - 0.03, back: true }, onFront && { spot: onFront, z: d / 2 - FACE_RECESS - deep + 0.03, back: false }].filter((m) => !!m);
+  return { body: body.geometry, lid: lid.geometry, marks };
 }
 
 const std = (color: string, roughness = 0.6, metalness = 0.05, extra: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
@@ -471,13 +534,13 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
     const skin = (tint: string) => new THREE.MeshStandardMaterial({ color: tint, roughness: 0.62, metalness: 0.02, transparent: true, opacity: s.mode === "xray" ? 0.3 : 1, side: THREE.DoubleSide });
     const shellMat = skin(color);
     const faceMat = skin(face || color);
-    let geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry };
+    let geos: ReturnType<typeof buildShell>;
     try {
       geos = buildShell(layout, shellMat);
     } catch (e) {
       // CSG can fail on degenerate sizes; show the plain box rather than nothing.
       console.error("enclosure build failed", e);
-      geos = { body: new RoundedBoxGeometry(w, h, d, 4, layout.radius), lid: new THREE.BufferGeometry() };
+      geos = { body: new RoundedBoxGeometry(w, h, d, 4, layout.radius), lid: new THREE.BufferGeometry(), marks: [] };
     }
     const step = d * 0.4 + 10;
     const movers: Movable[] = [];
@@ -486,8 +549,19 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
       movers.push({ obj, home: obj.position.clone(), away: obj.position.clone().add(new THREE.Vector3(0, 0, offsetZ)) });
       if (s.mode === "exploded") obj.position.z += offsetZ;
     };
-    add(new THREE.Mesh(geos.body, shellMat), 0);
-    add(new THREE.Mesh(geos.lid, faceMat), step * 5);
+    const bodyMesh = new THREE.Mesh(geos.body, shellMat);
+    const lidMesh = new THREE.Mesh(geos.lid, faceMat);
+    for (const m of geos.marks) {
+      // Dark plastic shows an engraving as a lighter, duller patch; light plastic shows it as a shadow.
+      const tint = new THREE.Color(m.back ? color : face || color);
+      const dark = 0.2126 * tint.r + 0.7152 * tint.g + 0.0722 * tint.b < 0.25;
+      tint.lerp(new THREE.Color(dark ? "#ffffff" : "#000000"), dark ? 0.16 : 0.3);
+      const fill = new THREE.Mesh(new THREE.ShapeGeometry(logoShapes(m.spot.h / LOGO.h)), new THREE.MeshStandardMaterial({ color: tint, roughness: 0.9, side: THREE.DoubleSide }));
+      fill.position.set(m.spot.x, m.spot.y, m.z);
+      (m.back ? bodyMesh : lidMesh).add(fill);
+    }
+    add(bodyMesh, 0);
+    add(lidMesh, step * 5);
 
     const order = { back: 1, power: 2, logic: 3, front: 4, external: 0 } as const;
     const c = new THREE.Color(face || color);
