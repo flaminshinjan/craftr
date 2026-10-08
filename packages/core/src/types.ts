@@ -53,6 +53,8 @@ export interface BlockDef {
   mount: Mount;
   /** Opening the enclosure needs on the face this block is mounted to. */
   cutout?: Cutout;
+  /** How much of the part's height passes out through its opening (a dial's shaft, a sensor's dome), so does not need room inside. */
+  protrude?: number;
   /** For a ring: the diameter of the hole in its middle, where a small part such as a button may sit. */
   hole?: number;
   /** True when the part is a disc or ring, so only its diameter (w) matters for fitting. */
@@ -105,7 +107,8 @@ export interface ProjectNode {
   y: number;
 }
 
-export type EnclosureStyle = "minimal" | "rugged" | "compact";
+/** slim lays every part side by side in one thin layer; the others stack parts to keep the footprint small. */
+export type EnclosureStyle = "slim" | "minimal" | "rugged" | "compact";
 /** rPLA and rPETG are recycled-content filaments, and are what new designs use. ABS and PC remain only for older designs. */
 export type Material = "rPLA" | "rPETG" | "PLA" | "PETG" | "ABS" | "PC";
 /** chalk: a dead-matte, slightly powdery surface from matte-grade filament. smooth: the usual soft sheen. */

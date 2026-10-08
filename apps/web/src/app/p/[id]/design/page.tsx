@@ -132,7 +132,7 @@ function Design({ p }: { p: Project }) {
             )}
           </Group>
           <Group label="Style">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {(Object.keys(STYLE) as EnclosureStyle[]).map((s) => (
                 <Option key={s} active={design.style === s} onClick={() => set({ style: s })} title={STYLE[s].blurb}>
                   <Box className={clsx("size-9", design.style === s ? "text-[#4d79d8]" : "text-ink-3")} strokeWidth={1.4} />

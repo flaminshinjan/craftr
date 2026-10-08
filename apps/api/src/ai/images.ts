@@ -32,7 +32,7 @@ export function decodeReference(dataUrl: unknown): Buffer | undefined {
 
 const COLOR_NAME: Record<string, string> = { "#F2EBDD": "warm cream", "#5FA052": "leaf green", "#D9B98E": "soft tan", "#C9C9C6": "light grey", "#3F4043": "charcoal" };
 const FACE_NAME: Record<string, string> = { "#1B1B1A": "matte black", "#F7F4EE": "off-white" };
-const STYLE_LOOK = { minimal: "clean, with soft rounded edges", rugged: "sturdy, with thick walls", compact: "slim and tight-fitting" };
+const STYLE_LOOK = { slim: "thin and flat like a coaster or a small tablet, with soft corners", minimal: "clean, with soft rounded edges", rugged: "sturdy, with thick walls", compact: "slim and tight-fitting" };
 
 /** What the screen should read, so a clock shows the time and a thermometer shows a temperature. */
 function screenText(nodes: ProjectNode[]): string {

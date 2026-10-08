@@ -511,8 +511,9 @@ function partObject(blockId: string, size: [number, number, number], reach: numb
     box(sx * 0.85, sy * 0.85, sz * 0.6, dark, 0, 0, -top + sz * 0.3);
     cyl((b?.cutout?.w ?? 7) / 2 - 0.35, sz * 0.4 + reach + 1.2, cap, 0, 0, top - sz * 0.4 + (sz * 0.4 + reach + 1.2) / 2);
   } else if (id === "rotary_encoder") {
-    box(sx, sy, 7, metal, 0, 0, -top + 3.5);
-    cyl(3, sz - 7, metal, 0, 0, -top + 7 + (sz - 7) / 2);
+    box(sx, sy, sz, metal, 0, 0, 0);
+    // The shaft passes out through the panel to the knob.
+    cyl(3, reach + 4, metal, 0, 0, top + (reach + 4) / 2);
     cyl(8, 11, cap, 0, 0, top + reach + 6.5);
   } else if (id === "led") {
     cyl(1.5, sz + reach + 0.5, std("#7dea8a", 0.3, 0, { emissive: "#3fd457", emissiveIntensity: 1.1 }), 0, 0, (reach + 0.5) / 2);

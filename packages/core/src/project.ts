@@ -2,7 +2,7 @@ import { getBlock } from "./blocks";
 import { COLORS } from "./layout";
 import type { DesignConfig, Feature, ProductSpec, ProjectDoc, ProjectNode } from "./types";
 
-export const DEFAULT_DESIGN: DesignConfig = { style: "minimal", material: "rPETG", color: COLORS[0], auto: true, width: 60, height: 60, depth: 30 };
+export const DEFAULT_DESIGN: DesignConfig = { style: "slim", material: "rPETG", color: COLORS[0], auto: true, width: 60, height: 60, depth: 30 };
 
 export const DEFAULT_SPEC: ProductSpec = {
   use_case: "",
@@ -83,7 +83,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Make me a small MagSafe voice-note device with one button, rechargeable battery, microphone, and phone sync.",
     description: "A puck that snaps to the back of your phone. Hold the button to record a voice note; it syncs over Bluetooth when you let go.",
     blocks: ["xiao_esp32s3", "mic_inmp441", "button", "led", "lipo_500", "magsafe_ring"],
-    design: { shape: "round", style: "compact", color: "#F2EBDD", face: "#1B1B1A", material: "rPETG" },
+    design: { shape: "round", style: "slim", color: "#F2EBDD", face: "#1B1B1A", material: "rPETG" },
     spec: { use_case: "Capture voice notes with one press and sync them to a phone", power_source: "battery", battery_target: "1 week of normal use", battery_target_hours: 72, duty: "event_driven", connectivity: ["Bluetooth LE", "Wi-Fi"], inputs: ["Button", "Microphone"], outputs: ["Status LED"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
   }),
   tpl({
@@ -93,7 +93,7 @@ export const TEMPLATES: Template[] = [
     prompt: "I want a MagSafe wallet plus power bank for my iPhone.",
     description: "A slab that snaps to the back of your iPhone, holds two cards in a front pocket and wirelessly tops up the phone from its own battery. Recharges over USB-C.",
     blocks: ["esp32_c3_supermini", "magsafe_charger", "powerbank_module", "lipo_5000", "led"],
-    design: { shape: "card", pocketCards: 2, style: "compact", color: "#3F4043", material: "rPETG" },
+    design: { shape: "card", pocketCards: 2, style: "slim", color: "#3F4043", material: "rPETG" },
     spec: { use_case: "Carry cards and wirelessly top up an iPhone", power_source: "battery", battery_target: "", battery_target_hours: null, duty: "event_driven", connectivity: ["Bluetooth LE"], inputs: [], outputs: ["Status LED", "Wireless phone charging"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
   }),
   tpl({
@@ -102,8 +102,8 @@ export const TEMPLATES: Template[] = [
     tagline: "Tells you when your plant needs water.",
     prompt: "Build a smart plant monitor that measures soil moisture and sends data to my phone.",
     description: "A Wi-Fi connected plant monitor that measures soil moisture and temperature and sends data to your phone, all in a compact enclosure.",
-    blocks: ["esp32_devkit", "soil_moisture", "dht22", "oled_096", "lipo_1000", "charger_tp4056"],
-    design: { style: "minimal", color: "#F2EBDD", face: "#1B1B1A", material: "rPETG" },
+    blocks: ["esp32_c3_supermini", "soil_moisture", "sht31", "oled_096", "lipo_1000", "charger_tp4056"],
+    design: { style: "slim", color: "#F2EBDD", face: "#1B1B1A", material: "rPETG" },
     spec: { use_case: "Monitor soil moisture and temperature for a house plant", power_source: "battery", battery_target: "2 weeks", battery_target_hours: 336, duty: "periodic", connectivity: ["Wi-Fi"], inputs: ["Soil moisture", "Temperature", "Humidity"], outputs: ["OLED display", "Phone notifications"], environment: "Indoor, near soil and water", mounting: "Stakes into the pot" },
   }),
   tpl({
@@ -125,7 +125,7 @@ export const TEMPLATES: Template[] = [
     description: "A USB-powered desk display with a precise climate sensor. Shows temperature and humidity and logs them over Wi-Fi.",
     blocks: ["esp32_c3_supermini", "sht31", "oled_096", "bh1750"],
     // Landscape, like a small desk clock.
-    design: { style: "minimal", color: "#5FA052", face: "#1B1B1A", stand: true, material: "rPLA", auto: false, width: 64, height: 44, depth: 24 },
+    design: { style: "slim", color: "#5FA052", face: "#1B1B1A", stand: true, material: "rPLA" },
     spec: { use_case: "Show and log room temperature and humidity", power_source: "usb", duty: "always_on", connectivity: ["Wi-Fi"], inputs: ["Temperature", "Humidity", "Ambient light"], outputs: ["OLED display"], mounting: "Sits on a desk" },
   }),
   // ───────── Simple lifestyle builds: few parts, an afternoon each ─────────
@@ -136,7 +136,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Make a night light that turns on when someone walks past, but only when the room is dark.",
     description: "A small light for a hallway or bedside. It senses movement and the room's brightness, and glows warm for a minute when you pass in the dark. Plugs into any USB-C charger.",
     blocks: ["esp32_c3_supermini", "pir", "bh1750", "rgb_led"],
-    design: { style: "minimal", color: "#F2EBDD", material: "rPLA" },
+    design: { style: "slim", color: "#F2EBDD", material: "rPLA" },
     spec: { use_case: "Light a hallway or bedside when someone passes at night", power_source: "usb", duty: "event_driven", connectivity: [], inputs: ["Motion", "Room brightness"], outputs: ["Warm light"], environment: "Indoor", mounting: "Sits on a shelf or sticks to a wall" },
   }),
   tpl({
@@ -146,7 +146,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Build a small desk clock that sets itself over Wi-Fi and shows the time and date.",
     description: "A little clock that leans back on your desk and keeps exact time from the internet. Press the button to switch between time, date and a timer. Plugs into USB-C.",
     blocks: ["esp32_c3_supermini", "oled_096", "button"],
-    design: { style: "minimal", color: "#D9B98E", face: "#1B1B1A", stand: true, material: "rPLA" },
+    design: { style: "slim", color: "#D9B98E", face: "#1B1B1A", stand: true, material: "rPLA" },
     spec: { use_case: "Show the time and date on a desk", power_source: "usb", duty: "always_on", connectivity: ["Wi-Fi"], inputs: ["Button"], outputs: ["OLED display"], environment: "Indoor desk", mounting: "Leans back on its feet" },
   }),
   tpl({
@@ -156,17 +156,17 @@ export const TEMPLATES: Template[] = [
     prompt: "Make a small rechargeable mood light I can tap to change colours.",
     description: "A palm-sized rechargeable light. Tap the button to step through colours, hold it to dim. Runs for a few hours on a charge.",
     blocks: ["esp32_c3_supermini", "rgb_led", "button", "lipo_500", "charger_tp4056"],
-    design: { shape: "round", style: "minimal", color: "#C9C9C6", material: "rPLA" },
+    design: { shape: "round", style: "slim", color: "#C9C9C6", material: "rPLA" },
     spec: { use_case: "Ambient coloured light for a room or bedside", power_source: "battery", battery_target: "3 hours of light", battery_target_hours: 3, duty: "always_on", connectivity: [], inputs: ["Button"], outputs: ["Coloured light"], environment: "Indoor", mounting: "Sits on a table" },
   }),
   tpl({
     id: "decision-cube",
-    name: "Decision Cube",
+    name: "Shake to Decide",
     tagline: "Shake it for an answer.",
-    prompt: "Make a little cube I can shake to get a random answer, a dice roll or a coin flip.",
-    description: "A pocket cube for settling things. Shake it and the screen shows a dice roll, a coin flip or a yes or no. Rechargeable over USB-C.",
+    prompt: "Make a little pocket gadget I can shake to get a random answer, a dice roll or a coin flip.",
+    description: "A slim pocket slab for settling things. Shake it and the screen shows a dice roll, a coin flip or a yes or no. Rechargeable over USB-C.",
     blocks: ["esp32_c3_supermini", "mpu6050", "oled_096", "lipo_500", "charger_tp4056"],
-    design: { style: "minimal", color: "#5FA052", face: "#1B1B1A", material: "rPLA" },
+    design: { style: "slim", color: "#5FA052", face: "#1B1B1A", material: "rPLA" },
     spec: { use_case: "Give a random answer when shaken", power_source: "battery", battery_target: "2 days", battery_target_hours: 48, duty: "event_driven", connectivity: [], inputs: ["Shake"], outputs: ["OLED display"], environment: "Indoor, handheld", mounting: "Held in the hand" },
   }),
   tpl({
@@ -176,7 +176,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Make something that sits on my desk and reminds me to drink water every hour.",
     description: "A desk puck that glows blue and gives a short buzz every hour until you tap it. Tap when you drink, and the ring fills up through the day.",
     blocks: ["esp32_c3_supermini", "rgb_led", "vibration_motor", "button", "lipo_500", "charger_tp4056"],
-    design: { shape: "round", style: "minimal", color: "#F2EBDD", material: "rPLA" },
+    design: { shape: "round", style: "slim", color: "#F2EBDD", material: "rPLA" },
     spec: { use_case: "Remind someone to drink water at regular intervals", power_source: "battery", battery_target: "3 days", battery_target_hours: 72, duty: "periodic", connectivity: [], inputs: ["Button"], outputs: ["Light ring", "Vibration"], environment: "Indoor desk", mounting: "Sits on a desk" },
   }),
   tpl({
@@ -186,7 +186,7 @@ export const TEMPLATES: Template[] = [
     prompt: "Make a desk light that shows whether I am free or busy, set with a dial.",
     description: "A light for your desk or door. Turn the dial to green, amber or red so people know whether they can interrupt. Plugs into USB-C.",
     blocks: ["esp32_c3_supermini", "rgb_led", "rotary_encoder"],
-    design: { style: "minimal", color: "#3F4043", material: "rPLA" },
+    design: { style: "slim", color: "#3F4043", material: "rPLA" },
     spec: { use_case: "Show availability to people nearby", power_source: "usb", duty: "always_on", connectivity: [], inputs: ["Dial"], outputs: ["Coloured light"], environment: "Indoor desk", mounting: "Sits on a desk" },
   }),
 ];

@@ -1,10 +1,11 @@
 import { resolveNodes } from "./wiring";
 import type { BlockDef, CardPocket, DesignConfig, EnclosureStyle, Finish, Layout, Material, PlacedCutout, Placement, ProjectNode } from "./types";
 
-export const STYLE: Record<EnclosureStyle, { wall: number; radius: number; clearance: number; label: string; blurb: string }> = {
+export const STYLE: Record<EnclosureStyle, { wall: number; radius: number; clearance: number; /** Extra room kept around the parts, which lets the corners be rounder. */ margin?: number; label: string; blurb: string }> = {
+  slim: { wall: 1.6, radius: 9, clearance: 0.6, margin: 2.5, label: "Slim", blurb: "One thin layer, parts side by side" },
   minimal: { wall: 2, radius: 8, clearance: 1.2, label: "Minimal", blurb: "Soft corners, clean faces" },
   rugged: { wall: 3, radius: 4, clearance: 1.5, label: "Rugged", blurb: "Thick walls, survives drops" },
-  compact: { wall: 1.6, radius: 5, clearance: 0.6, label: "Compact", blurb: "As small as the parts allow" },
+  compact: { wall: 1.6, radius: 5, clearance: 0.6, label: "Compact", blurb: "Smallest footprint, parts stacked" },
 };
 
 export const MATERIAL: Record<Material, { name: string; density: number; inrPerG: number; blurb: string; recycled: boolean }> = {
@@ -75,11 +76,12 @@ const clash = (a: Placed, b: Placed) => !nested(a, b) && !nested(b, a) && Math.a
  * Packs parts into a disc of radius r. Boards with a USB port go hard against the right-hand wall;
  * everything else takes the free spot nearest the centre, turned 90° when that helps.
  */
-function packCircle(items: Item[], r: number): Placed[] | null {
+function packCircle(items: Item[], r: number, fixed: Placed[] = []): Placed[] | null {
   // Ports claim the wall first; then the things a person touches or looks at take the centre.
   const rank = (i: Item) => (i.block.port ? 0 : i.block.category === "input" || i.block.category === "display" ? 1 : 2);
   const sorted = [...items].sort((a, b) => rank(a) - rank(b) || b.w * b.d - a.w * a.d);
-  const placed: Placed[] = [];
+  // Parts already placed (the composed front face) stay where they are; the rest fill in around them.
+  const placed: Placed[] = [...fixed];
   const free = (c: Placed) => inCircle(c, r) && !placed.some((p) => clash(c, p));
   const n = Math.floor(r);
   const grid: [number, number][] = [];
@@ -117,14 +119,14 @@ function packCircle(items: Item[], r: number): Placed[] | null {
 
 const radiusCache = new Map<string, number>();
 /** Smallest disc (to the millimetre) the parts pack into. */
-function minRadius(items: Item[]): number {
-  if (!items.length) return 0;
-  const key = items.map((i) => `${i.block.id}:${i.w}x${i.d}`).sort().join("|");
+function minRadius(items: Item[], fixed: Placed[] = []): number {
+  if (!items.length && !fixed.length) return 0;
+  const key = items.map((i) => `${i.block.id}:${i.w}x${i.d}`).sort().join("|") + "//" + fixed.map((i) => `${i.block.id}@${i.x},${i.y}`).join("|");
   const hit = radiusCache.get(key);
   if (hit !== undefined) return hit;
-  const area = items.reduce((s, i) => s + (i.block.round ? (Math.PI * i.w * i.w) / 4 : i.w * i.d), 0);
+  const area = [...items, ...fixed].reduce((s, i) => s + (i.block.round ? (Math.PI * i.w * i.w) / 4 : i.w * i.d), 0);
   let r = Math.ceil(Math.max(Math.sqrt(area / Math.PI), ...items.map((i) => (i.block.round ? i.w / 2 : Math.hypot(i.w, i.d) / 2))));
-  while (!packCircle(items, r) && r < 400) r++;
+  while (!(fixed.every((f) => inCircle(f, r)) && packCircle(items, r, fixed)) && r < 400) r++;
   radiusCache.set(key, r);
   return r;
 }
@@ -140,7 +142,7 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   const card = design.shape === "card";
   let pocket: CardPocket | null = null;
   const parts = resolveNodes(nodes);
-  const item = (p: (typeof parts)[number]): Item => ({ nodeId: p.node.id, block: p.block, w: p.block.size.w, d: p.block.size.d, t: p.block.size.h });
+  const item = (p: (typeof parts)[number]): Item => ({ nodeId: p.node.id, block: p.block, w: p.block.size.w, d: p.block.size.d, t: p.block.size.h - (p.block.protrude ?? 0) });
   const by = (f: (b: BlockDef) => boolean) => parts.filter((p) => f(p.block)).map(item);
 
   const groups: Record<LayerKey, Item[]> = {
@@ -156,12 +158,46 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   let outer: Layout["outer"];
   let fits: boolean;
 
+  // Slim lays every part in one plane, side by side, so the device is only as thick as its tallest part.
+  // A card keeps its fixed footprint, so it cannot spread out and stays stacked.
+  const flat = design.style === "slim" && !card;
+  const gap = flat ? 1 : LAYER_GAP;
+  // A magnet ring or other wafer-thin back part stays as a sheet underneath, rather than taking a place in the plane.
+  const under = flat ? groups.back.filter((i) => i.t <= 2) : [];
+  const base = under.length ? Math.max(...under.map((i) => i.t)) + gap : 0;
+  const inPlane = flat ? [...groups.back.filter((i) => i.t > 2), ...groups.power, ...groups.logic, ...groups.front] : [];
+  const layerOf = new Map<string, LayerKey>();
+  if (flat) {
+    for (const i of groups.back) layerOf.set(i.nodeId, "back");
+    for (const i of groups.front) layerOf.set(i.nodeId, "front");
+    groups.logic = [...groups.logic, ...groups.power];
+    groups.power = [];
+  }
+  const split = (placed: Placed[]) => {
+    for (const k of ["back", "logic", "front"] as const) {
+      const mine = placed.filter((p) => (layerOf.get(p.nodeId) ?? "logic") === k);
+      if (mine.length) placedLayers[k] = [...(placedLayers[k] ?? []), ...mine];
+    }
+  };
+
   // Put power and logic boards side by side when that does not grow the footprint: a thinner device for free.
   const mergeInternal = () => {
     groups.logic = [...groups.logic, ...groups.power];
     groups.power = [];
   };
-  if (shape === "round") {
+  if (shape === "round" && flat) {
+    // Compose the face first, centred, then let the boards fill the ring of space around it.
+    const face = groups.front.length ? packCircle(groups.front, minRadius(groups.front))! : [];
+    const rest = inPlane.filter((i) => layerOf.get(i.nodeId) !== "front");
+    const r = Math.max(8, minRadius(rest, face), minRadius(under));
+    const dia = ceil(2 * r + pad);
+    minOuter = { w: dia, h: dia, d: 0 };
+    outer = design.auto ? { ...minOuter } : { w: design.width, h: design.width, d: design.depth };
+    fits = outer.w >= minOuter.w;
+    const room = outer.w / 2 - wall - clearance;
+    if (under.length) placedLayers.back = packCircle(under, room) ?? packCircle(under, minRadius(under))!;
+    split(packCircle(rest, room, face) ?? packCircle(rest, minRadius(rest, face), face)!);
+  } else if (shape === "round") {
     const radii = () => ORDER.map((k) => minRadius(groups[k]));
     if (groups.power.length && groups.logic.length && minRadius([...groups.logic, ...groups.power]) <= Math.max(...radii())) mergeInternal();
     const r = Math.max(8, ...radii());
@@ -173,8 +209,9 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     for (const k of ORDER) if (groups[k].length) placedLayers[k] = packCircle(groups[k], room) ?? packCircle(groups[k], minRadius(groups[k]))!;
   } else {
     // With a size the user chose, lay rows out to the width they gave, so a wide box gets wide rows.
-    const roomW = card ? CARD.w - pad : design.auto ? undefined : design.width - pad;
-    const roomH = card ? CARD.h - pad : design.height - pad;
+    const padXY = pad + 2 * (flat ? (style.margin ?? 0) : 0);
+    const roomW = card ? CARD.w - pad : design.auto ? undefined : design.width - padXY;
+    const roomH = card ? CARD.h - pad : design.height - padXY;
     // On a card, the small boards tuck in around the charging pad or magnet ring, leaving one thin layer for the battery.
     if (card && groups.back.length) {
       const isCell = (i: Item) => i.block.tags.includes("battery");
@@ -186,6 +223,43 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
         groups.power = groups.power.filter(isCell);
       }
     }
+    /**
+     * Slim boxes are composed face first: the front parts sit together in the middle of the face,
+     * and the boards go either side of them or in a band underneath, whichever comes out tighter.
+     */
+    const compose = (): Packed => {
+      // A few front parts read best as one row across the face.
+      const face = groups.front.length <= 3 ? pack(groups.front, groups.front.reduce((s, i) => s + i.w + GAP, 0)) : pack(groups.front);
+      const rest = inPlane.filter((i) => layerOf.get(i.nodeId) !== "front");
+      const done = (items: Placed[], w: number, h: number): Packed => ({ items, w, h, t: Math.max(0, ...items.map((i) => i.t)), hasPort: rest.some((i) => !!i.block.port) });
+      if (!rest.length) return done(face.items, face.w, face.h);
+      if (!face.items.length) return pack(rest);
+      const shift = (p: Packed, dx: number, dy: number) => p.items.map((i) => ({ ...i, x: i.x + dx, y: i.y + dy }));
+      const column = (items: Item[]) => pack(items, Math.max(0, ...items.map((i) => i.w)));
+      // Either side: boards with a port go right, to reach the wall; the others balance the two sides.
+      const right = rest.filter((i) => i.block.port);
+      const left: Item[] = [];
+      const areaOf = (list: Item[]) => list.reduce((s, i) => s + i.w * i.d, 0);
+      for (const i of rest.filter((x) => !x.block.port).sort((a, b) => b.w * b.d - a.w * a.d)) (areaOf(left) <= areaOf(right) ? left : right).push(i);
+      const L = column(left);
+      const R = column(right);
+      const half = face.w / 2 + Math.max(L.items.length ? GAP + L.w : 0, R.items.length ? GAP + R.w : 0);
+      const sides = done([...face.items, ...shift(L, -half + L.w / 2, 0), ...shift(R, half - R.w / 2, 0)], 2 * half, Math.max(face.h, L.h, R.h));
+      // A wide flat slab reads as sleek; a tall thin one reads as a remote control.
+      const score = (p: Packed) => p.w * p.h * (1 + 0.5 * Math.abs(Math.log(p.w / p.h))) * (p.h > p.w * 1.15 ? 1.3 : 1);
+      // Underneath: the face group at the top, a band of boards below it. Try each band width and keep the best.
+      let best = sides;
+      const widest = Math.max(face.w, ...rest.map((i) => i.w));
+      const total = Math.max(widest, rest.reduce((s, i) => s + i.w + GAP, 0));
+      for (let bw = widest; bw <= total; bw += 2) {
+        const band = pack(rest, bw);
+        const w = Math.max(face.w, band.w);
+        const h = face.h + GAP + band.h;
+        const below = done([...shift(face, 0, h / 2 - face.h / 2), ...shift(band, band.hasPort ? w / 2 - band.w / 2 : 0, -h / 2 + band.h / 2)], w, h);
+        if (score(below) < score(best) - 1e-6) best = below;
+      }
+      return best;
+    };
     const fit = (items: Item[]) => {
       const natural = pack(items);
       if (roomW === undefined) return natural;
@@ -193,6 +267,14 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
       return wide.w <= roomW && wide.h <= roomH ? wide : natural;
     };
     const packed = Object.fromEntries(ORDER.map((k) => [k, fit(groups[k])])) as Record<LayerKey, Packed>;
+    // Slim: one joint packing stands in for the logic layer when sizing; the parts are dealt back to their layers below.
+    const joint = flat ? compose() : null;
+    if (joint) {
+      packed.back = fit(under);
+      packed.power = pack([]);
+      packed.logic = joint;
+      packed.front = pack([]);
+    }
     const merged = fit([...groups.logic, ...groups.power]);
     const capW = Math.max(...ORDER.map((k) => packed[k].w));
     const capH = Math.max(...ORDER.map((k) => packed[k].h));
@@ -201,10 +283,10 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
       packed.logic = merged;
       packed.power = pack([]);
     }
-    const live = ORDER.filter((k) => groups[k].length);
+    const live = ORDER.filter((k) => (joint ? packed[k].items.length : groups[k].length));
     const innerW = Math.max(16, ...live.map((k) => packed[k].w));
     const innerH = Math.max(16, ...live.map((k) => packed[k].h));
-    minOuter = { w: Math.max(ceil(innerW + pad), card ? CARD.w : 0), h: Math.max(ceil(innerH + pad), card ? CARD.h : 0), d: 0 };
+    minOuter = { w: Math.max(ceil(innerW + padXY), card ? CARD.w : 0), h: Math.max(ceil(innerH + padXY), card ? CARD.h : 0), d: 0 };
     // A card keeps its footprint and is always as thin as the parts allow.
     outer = design.auto || card ? { ...minOuter } : { w: design.width, h: design.height, d: design.depth };
     fits = outer.w >= minOuter.w && outer.h >= minOuter.h;
@@ -215,7 +297,12 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     const pocketH = Math.min(BANK_CARD.h - 14, outer.h - strip - 6);
     if (cards && pocketH >= 45) pocket = { w: Math.min(outer.w - 4, BANK_CARD.w + 5), h: pocketH, y: outer.h / 2 - 3 - pocketH / 2, d: cards * BANK_CARD.t + 2.3, slot: cards * BANK_CARD.t + 0.7, cards };
     const frontDrop = pocket ? -(outer.h / 2 - wall - clearance) + packed.front.h / 2 : 0;
-    for (const k of live) {
+    if (joint) {
+      if (under.length) placedLayers.back = packed.back.items;
+      // The face stays centred; only the boards with a port slide out to meet the right-hand wall.
+      split(joint.items.map((it) => (it.block.port ? { ...it, x: halfW - clearance - it.w / 2 } : it)));
+    }
+    for (const k of joint ? [] : live) {
       const L = packed[k];
       const xo = L.hasPort ? halfW - clearance - L.w / 2 : 0;
       // On a card the front parts live in a strip along the bottom, so everything else slides to the top
@@ -233,13 +320,19 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     for (const k of ORDER) {
       const items = placedLayers[k];
       if (!items || k === "front") continue;
+      if (flat) {
+        // Everything rests on the rear wall, above the thin sheet of back parts if there is one.
+        for (const it of items) solids.push({ it, top: it.t <= 2 && k === "back" ? it.t : base + it.t });
+        continue;
+      }
       const t = thick(k);
       for (const it of items) solids.push({ it, top: k === "back" ? it.t : top + t / 2 + it.t / 2 });
-      top += t + LAYER_GAP;
+      top += t + gap;
     }
+    if (flat) top = Math.max(0, ...solids.map((x) => x.top)) + gap;
     const over = (a: Placed, b: Placed) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 1 && Math.abs(a.y - b.y) < (a.d + b.d) / 2 + 1;
-    const front = (placedLayers.front ?? []).map((f) => f.t + Math.max(0, ...solids.filter((s) => over(f, s.it)).map((s) => s.top + LAYER_GAP)));
-    const need = ceil(Math.max(6, top - LAYER_GAP, ...front) + pad);
+    const front = (placedLayers.front ?? []).map((f) => f.t + Math.max(0, ...solids.filter((s) => over(f, s.it)).map((s) => s.top + gap)));
+    const need = ceil(Math.max(flat ? 4 : 6, top - gap, ...front) + pad);
     minOuter.d = need;
     if (design.auto || card) outer.d = need;
     fits = fits && outer.d >= need;
@@ -256,13 +349,14 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     if (!items) continue;
     const t = thick(k);
     for (const it of items) {
-      const pz = k === "front" ? cavityD / 2 - clearance - it.t / 2 : k === "back" ? -cavityD / 2 + clearance + it.t / 2 : z + t / 2;
+      const rear = -cavityD / 2 + clearance;
+      const pz = k === "front" ? cavityD / 2 - clearance - it.t / 2 : k === "back" ? rear + (flat && it.t > 2 ? base : 0) + it.t / 2 : flat ? rear + base + it.t / 2 : z + t / 2;
       const pos: [number, number, number] = [it.x, it.y, pz];
       placements.push({ nodeId: it.nodeId, blockId: it.block.id, pos, size: [it.w, it.d, it.t], layer: k, ...(it.rotated ? { rotated: true } : {}) });
       if (it.block.cutout && (k === "front" || k === "back")) cutouts.push({ nodeId: it.nodeId, label: it.block.name, face: k, ...it.block.cutout, u: pos[0], v: pos[1] });
       if (it.block.port) cutouts.push({ nodeId: it.nodeId, label: `${it.block.name} USB-C`, face: "right", ...it.block.port, u: pos[2], v: pos[1] });
     }
-    z += t + LAYER_GAP;
+    z += t + gap;
   }
 
   for (const p of parts) {
@@ -282,11 +376,11 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   const shellVolumeCm3 = Math.round(shellMm3 / 100) / 10;
   const density = (MATERIAL[design.material] ?? MATERIAL.PLA).density;
   const massG = Math.round(shellVolumeCm3 * density * 0.85 + parts.reduce((s, p) => s + p.block.massG, 0));
-  const limit = Math.min(outer.w, outer.h, outer.d) / 2 - 0.5;
+  const limit = (shape === "round" ? Math.min(outer.w, outer.d) : Math.min(outer.w, outer.h)) / 2 - 0.5;
 
   const stand = !!design.stand && shape === "box" && !card && !parts.some((x) => x.block.mount === "bottom_external");
   // Corners as round as the style wants, but never so round that the inside of a corner cuts into a part.
-  let radius = Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : design.style === "minimal" ? Math.min(14, Math.max(style.radius, Math.min(outer.w, outer.h) * 0.2)) : style.radius, limit);
+  let radius = Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : design.style === "minimal" || design.style === "slim" ? Math.min(14, Math.max(style.radius, Math.min(outer.w, outer.h) * 0.2)) : style.radius, limit);
   let innerRadius = Math.max(0.6, radius - wall);
   if (shape === "box") {
     const round = new Set(parts.filter((x) => x.block.round).map((x) => x.node.id));
