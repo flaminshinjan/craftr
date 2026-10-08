@@ -117,6 +117,8 @@ export interface DesignConfig {
   style: EnclosureStyle;
   material: Material;
   color: string;
+  /** A wedge under a box so it leans back on a desk. Ignored on other shapes. */
+  stand?: boolean;
   /** Colour of the front panel, which is printed as its own part. Left out, it matches the body. */
   face?: string;
   /** When true the outer size follows the components; when false the user's numbers are used. */
@@ -187,11 +189,15 @@ export interface Layout {
   /** The shell the viewer builds: a card is a box with a fixed footprint. */
   shape: "box" | "round";
   card: boolean;
+  /** True when the body carries a wedge underneath and leans back. */
+  stand: boolean;
   pocket: CardPocket | null;
   outer: { w: number; h: number; d: number };
   minOuter: { w: number; h: number; d: number };
   wall: number;
   radius: number;
+  /** Corner radius of the cavity: as round as the parts in the corners allow. */
+  innerRadius: number;
   clearance: number;
   placements: Placement[];
   cutouts: PlacedCutout[];

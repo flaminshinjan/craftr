@@ -92,7 +92,7 @@ export const TEMPLATES: Template[] = [
     tagline: "Carries your cards and tops up your phone.",
     prompt: "I want a MagSafe wallet plus power bank for my iPhone.",
     description: "A slab that snaps to the back of your iPhone, holds two cards in a front pocket and wirelessly tops up the phone from its own battery. Recharges over USB-C.",
-    blocks: ["esp32_c3_supermini", "magsafe_charger", "powerbank_module", "lipo_3000", "led"],
+    blocks: ["esp32_c3_supermini", "magsafe_charger", "powerbank_module", "lipo_5000", "led"],
     design: { shape: "card", pocketCards: 2, style: "compact", color: "#3F4043", material: "PETG" },
     spec: { use_case: "Carry cards and wirelessly top up an iPhone", power_source: "battery", battery_target: "", battery_target_hours: null, duty: "event_driven", connectivity: ["Bluetooth LE"], inputs: [], outputs: ["Status LED", "Wireless phone charging"], mounting: "MagSafe, back of phone", enclosure_style: "compact" },
   }),
@@ -125,7 +125,7 @@ export const TEMPLATES: Template[] = [
     description: "A USB-powered desk display with a precise climate sensor. Shows temperature and humidity and logs them over Wi-Fi.",
     blocks: ["esp32_c3_supermini", "sht31", "oled_096", "bh1750"],
     // Landscape, like a small desk clock.
-    design: { style: "minimal", color: "#5FA052", face: "#1B1B1A", material: "PLA", auto: false, width: 64, height: 44, depth: 24 },
+    design: { style: "minimal", color: "#5FA052", face: "#1B1B1A", stand: true, material: "PLA", auto: false, width: 64, height: 44, depth: 24 },
     spec: { use_case: "Show and log room temperature and humidity", power_source: "usb", duty: "always_on", connectivity: ["Wi-Fi"], inputs: ["Temperature", "Humidity", "Ambient light"], outputs: ["OLED display"], mounting: "Sits on a desk" },
   }),
 ];

@@ -34,7 +34,7 @@ const DesignSchema = z.object({
   reply: z.string(),
   blocks: z.array(z.object({ block_id: z.string(), reason: z.string() })),
   spec: SpecSchema,
-  enclosure: z.object({ shape: z.enum(["box", "round", "card"]), pocket_cards: z.number(), style: z.enum(["minimal", "rugged", "compact"]), color: z.string(), face_color: z.string(), material: z.enum(["PLA", "ABS", "PETG", "PC"]) }),
+  enclosure: z.object({ shape: z.enum(["box", "round", "card"]), pocket_cards: z.number(), style: z.enum(["minimal", "rugged", "compact"]), color: z.string(), face_color: z.string(), stand: z.boolean(), material: z.enum(["PLA", "ABS", "PETG", "PC"]) }),
   features: z.array(z.object({ icon: z.enum(ICONS), label: z.string() })),
   plan: z.object({ components: z.string(), enclosure: z.string(), firmware: z.string(), bom: z.string(), manufacturing: z.string() }),
 });
@@ -55,8 +55,8 @@ Engineering rules that Craftr's validator enforces after you answer, so follow t
 - Only one I2S microphone, one I2S speaker, one serial device and one SPI display per device. Never two blocks with the same I2C address.
 - Small controllers have few pins; do not overload them.
 - Pick the smallest battery that meets the stated battery life, and say what the tradeoff is.
-- To charge a phone the device needs magsafe_charger, powerbank_module and a large battery (lipo_3000). magsafe_charger already contains the magnet ring, so never add magsafe_ring beside it, and powerbank_module replaces charger_tp4056.
-- The enclosure generator can make exactly this and nothing else: a box, a round puck or a phone-back card; openings for the chosen parts; and, on the card shape, an outside card pocket. Never promise a strap, clip, hinge, stand, lens, cable channel or any other feature in the description, reply or plan. If the idea needs one, say it is not available yet.
+- To charge a phone the device needs magsafe_charger, powerbank_module and a power bank cell: lipo_5000 (6.5 mm thick, the slim default), lipo_10000 (12 mm) or lipo_20000 (24 mm, a brick). Use the capacity the customer asks for; when they give none use lipo_5000, and say in the reply that 10000 and 20000 mAh are available and how much thicker they make it. lipo_3000 is only for when they ask for the thinnest possible. magsafe_charger already contains the magnet ring, so never add magsafe_ring beside it, and powerbank_module replaces charger_tp4056.
+- The enclosure generator can make exactly this and nothing else: a box, a round puck or a phone-back card; openings for the chosen parts; and, on the card shape, an outside card pocket. Never promise a strap, clip, hinge, lens, cable channel or any other feature in the description, reply or plan. If the idea needs one, say it is not available yet.
 - Add only what the idea needs. Fewer blocks means a cheaper, smaller device that is more likely to work first time.`;
 
 async function parse<T extends z.ZodType>(schema: T, system: string, user: string, effort: "low" | "medium"): Promise<z.infer<T>> {
@@ -82,7 +82,7 @@ export function designProduct(prompt: string): Promise<ProductDesign> {
 - reply: one friendly sentence confirming what you are about to build, plus any assumption you had to make. Shown in the chat.
 - blocks: the catalogue blocks to use, each with a one-line reason.
 - spec: the structured product spec. battery_target_hours is the battery life the user wants in hours, or null when it runs from USB. duty is how the device behaves: always_on, periodic (wakes every few minutes, sleeps in between) or event_driven (sleeps until a button or motion).
-- enclosure: shape, pocket_cards, style, a hex colour that suits the product, face_color, and a print material. The front is a flat panel set into the body and printed as its own part: face_color is its hex colour, or an empty string to match the body. A near-black panel (#1B1B1A) on a light body hides a screen and its sensors behind one dark face and usually looks best on anything with a display; use a matching panel for plain objects. Shape is "card" for anything that lies flat on the back of a phone or is carried like a wallet (wallets, battery packs, card holders): a 66 × 102 mm slab as thin as the parts allow. Shape is "round" for pucks, dials and coin-like things. Otherwise "box". pocket_cards is how many bank cards an outside pocket should hold (1 to 3) and is only possible on the card shape; use 0 when there is no pocket.
+- enclosure: shape, pocket_cards, style, a hex colour that suits the product, face_color, stand, and a print material. stand is true only for a box that is read on a desk or shelf (clocks, displays, monitors): it adds a wedge underneath so the face leans back 12 degrees towards the reader. It is false for anything handheld, worn, flipped over, wall-mounted, stuck in soil, or any round or card shape. The front is a flat panel set into the body and printed as its own part: face_color is its hex colour, or an empty string to match the body. A near-black panel (#1B1B1A) on a light body hides a screen and its sensors behind one dark face and usually looks best on anything with a display; use a matching panel for plain objects. Shape is "card" for anything that lies flat on the back of a phone or is carried like a wallet (wallets, battery packs, card holders): a 66 × 102 mm slab as thin as the parts allow. Shape is "round" for pucks, dials and coin-like things. Otherwise "box". pocket_cards is how many bank cards an outside pocket should hold (1 to 3) and is only possible on the card shape; use 0 when there is no pocket.
 - features: three to five short chips for the summary card.
 - plan: one short line per step describing what Craftr will do for this specific product.`,
     "medium",
@@ -103,6 +103,7 @@ const EditSchema = z.object({
     material: z.enum(["PLA", "ABS", "PETG", "PC"]).nullable(),
     color: z.string().nullable(),
     face_color: z.string().nullable(),
+    stand: z.boolean().nullable(),
     width: z.number().nullable(),
     height: z.number().nullable(),
     depth: z.number().nullable(),
@@ -147,7 +148,7 @@ export function editProduct(project: ProjectContext, history: { role: "user" | "
 - changes: a short list of the concrete changes, for example "Swapped the 1000 mAh battery for 2000 mAh". Empty when nothing changed.
 - add_blocks / remove_blocks: catalogue ids. To swap a part, remove the old id and add the new one.
 - name, description: new values, or null to keep them.
-- design: only the fields to change, null for the rest. face_color is the hex colour of the front panel, or an empty string to make it match the body. Shape is box, round (a puck whose diameter is its width) or card (a 66 × 102 mm phone-back slab, which is the only shape that can carry pocket_cards). Width, height and depth are outer millimetres; set them only when the customer asks for a size, and never below the smallest possible size.
+- design: only the fields to change, null for the rest. stand adds or removes the wedge that leans a box back on a desk. face_color is the hex colour of the front panel, or an empty string to make it match the body. Shape is box, round (a puck whose diameter is its width) or card (a 66 × 102 mm phone-back slab, which is the only shape that can carry pocket_cards). Width, height and depth are outer millimetres; set them only when the customer asks for a size, and never below the smallest possible size.
 - spec: only the fields to change, null for the rest.
 - rewrite_firmware: true when the device should behave differently, not merely when parts change (Craftr rewires and regenerates driver code on its own).`,
     "low",
@@ -256,7 +257,7 @@ export function designByKeywords(prompt: string): ProductDesign {
       enclosure_style: small ? "compact" : "minimal",
       manufacturing_method: "FDM 3D printing",
     },
-    enclosure: { shape: has("wallet", "power bank", "powerbank", "card holder") ? "card" : has("magsafe", "puck", "round") ? "round" : "box", pocket_cards: has("wallet", "card holder") ? 2 : 0, style: small ? "compact" : "minimal", color: "#F2EBDD", face_color: "", material: "PETG" },
+    enclosure: { shape: has("wallet", "power bank", "powerbank", "card holder") ? "card" : has("magsafe", "puck", "round") ? "round" : "box", pocket_cards: has("wallet", "card holder") ? 2 : 0, style: small ? "compact" : "minimal", color: "#F2EBDD", face_color: "", stand: false, material: "PETG" },
     features: [],
     plan: { components: "Choose sensors, MCU, power, and connectivity modules", enclosure: "Create a compact enclosure around the parts", firmware: "Read sensors and drive outputs", bom: "Estimate prototype cost and source parts", manufacturing: "Finalize design files and manufacturing plan" },
   };

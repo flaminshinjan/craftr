@@ -86,7 +86,7 @@ export function compile(input: { nodes: ProjectNode[]; design: DesignConfig; spe
   // How much charge a power bank can actually hand to a phone (about 60% survives boost and wireless losses).
   if (parts.some((p) => p.block.tags.includes("wireless_charging")) && power.capacityMah) {
     const pct = Math.round(((power.capacityMah * 3.7 * 0.6) / 1000 / 12.7) * 100);
-    checks.push({ id: "phone-topup", level: pct < 25 ? "warn" : "ok", title: "Phone top-up", detail: `${power.capacityMah} mAh gives a recent iPhone roughly a ${pct}% top-up over wireless charging.` });
+    checks.push({ id: "phone-topup", level: pct < 25 ? "warn" : "ok", title: "Phone top-up", detail: pct >= 100 ? `${power.capacityMah} mAh gives a recent iPhone roughly ${(pct / 100).toFixed(1)} full charges over wireless charging.` : `${power.capacityMah} mAh gives a recent iPhone roughly a ${pct}% top-up over wireless charging.` });
   }
 
   // Mechanical.

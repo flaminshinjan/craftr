@@ -49,7 +49,7 @@ export function assemblyGuide(p: { nodes: ProjectNode[]; design: DesignConfig; c
   if (boards.length)
     add(
       "Seat the boards in the body",
-      "Work from the rear wall forward, in this order. Each board drops between its printed corner posts and rests on their ledges. A board that sits over another part has no posts under it: fix it with a square of double-sided foam tape. Line each USB-C port up with its opening on the right side.",
+      "Work from the rear wall forward, in this order. Each board rests on the ledges of its printed posts: tilt one edge in under the clips, then press the other edge down until it clicks. A part with no posts around it (it sits directly on another part) is fixed with a square of double-sided foam tape. Line each USB-C port up with its opening on the right side.",
       boards,
     );
   if (outside.length) add("Fit the outside parts", "These pass through their openings from outside. Seal around each with a little glue.", outside);

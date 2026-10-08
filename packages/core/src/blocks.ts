@@ -724,6 +724,10 @@ export const BLOCKS: BlockDef[] = [
     ["lipo_1000", "Li-Po Battery", 1000, { w: 48, d: 30, h: 6 }, 220],
     ["lipo_2000", "Li-Po Battery 2000", 2000, { w: 60, d: 34, h: 8 }, 340],
     ["lipo_3000", "Slim Li-Po 3000", 3000, { w: 50, d: 72, h: 6.5 }, 520],
+    // Power bank cells. All three share a footprint that fits the phone-back card; only the thickness grows.
+    ["lipo_5000", "Power Bank Cell 5000", 5000, { w: 56, d: 86, h: 6.5 }, 690],
+    ["lipo_10000", "Power Bank Cell 10000", 10000, { w: 56, d: 86, h: 12 }, 1150],
+    ["lipo_20000", "Power Bank Pack 20000", 20000, { w: 56, d: 86, h: 24 }, 2100],
   ] as const).map(([id, name, mah, size, price]) =>
     def({
       id,

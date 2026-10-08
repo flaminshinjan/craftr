@@ -184,11 +184,15 @@ function logoBrush(spot: Box2, z: number, depth: number, mat: THREE.Material) {
 
 const POST_FIT = 0.15;
 const POST_WALL = 0.8;
+const LEDGE = 1.2;
+const CLIP_RISE = 1.25;
+const CLIP_REACH = 0.4;
+const STAND_TILT = (12 * Math.PI) / 180;
 
 /**
- * The printed features that hold parts: corner posts that locate and support each board in the body,
- * and low frames on the inside of the front panel for the parts that mount to it.
- * Posts are left out wherever they would run through another part.
+ * The printed features that hold parts: posts along the edges of each board in the body, which locate it,
+ * support it on a ledge and clip over it, and low frames inside the front panel for the parts that mount there.
+ * A post is left out only where it would run through another part.
  */
 function fixtures(l: Layout) {
   const { w, h, d } = l.outer;
@@ -218,22 +222,60 @@ function fixtures(l: Layout) {
       held.add(p.nodeId);
       continue;
     }
-    if (p.layer === "external" || getBlock(p.blockId)?.round || Math.min(sx, sy) < 8) continue;
+    if (p.layer === "external" || Math.min(sx, sy) < 5) continue;
     const bottom = pz - sz / 2;
-    const top = Math.min(pz + sz / 2, cap);
-    for (const cx of [-1, 1]) {
-      for (const cy of [-1, 1]) {
-        const x = px + (cx * sx) / 2;
-        const y = py + (cy * sy) / 2;
-        if (!inside(x + cx * out, y + cy * out, 0.5)) continue;
-        // The column runs from the floor to the top of the board; it must not pass through anything else.
-        const blocked = l.placements.some((o) => o.nodeId !== p.nodeId && o.layer !== "external" && o.pos[2] - o.size[2] / 2 < top && Math.abs(o.pos[0] - (x - cx * 0.5)) < o.size[0] / 2 + 2.6 && Math.abs(o.pos[1] - (y - cy * 0.5)) < o.size[1] / 2 + 2.6);
-        if (blocked) continue;
-        const at = (u: number, v: number) => new THREE.Vector2(x + cx * u, y + cy * v);
-        if (bottom - floor > 0.05) feet.push(prism([at(-2, -2), at(out, -2), at(out, out), at(-2, out)], floor, Math.min(bottom, cap)));
-        if (top - bottom > 1) guides.push(prism([at(POST_FIT, -4), at(out, -4), at(out, out), at(-4, out), at(-4, POST_FIT), at(POST_FIT, POST_FIT)], Math.max(floor, bottom - 0.2), top));
-        held.add(p.nodeId);
+    const top = pz + sz / 2;
+    if (bottom > cap) continue;
+    const isRound = !!getBlock(p.blockId)?.round;
+    // Where posts may stand: two along each edge of a board, or four around a disc.
+    type Spot = { x: number; y: number; nx: number; ny: number; axis: "x" | "y" | "r" };
+    const spots: Spot[] = [];
+    if (isRound) for (const a of [45, 135, 225, 315].map((g) => (g * Math.PI) / 180)) spots.push({ x: px + (Math.cos(a) * sx) / 2, y: py + (Math.sin(a) * sx) / 2, nx: Math.cos(a), ny: Math.sin(a), axis: "r" });
+    else
+      for (const f of [-0.3, 0.3, 0]) {
+        for (const side of [-1, 1]) {
+          spots.push({ x: px + (side * sx) / 2, y: py + f * sy, nx: side, ny: 0, axis: "x" });
+          spots.push({ x: px + f * sx, y: py + (side * sy) / 2, nx: 0, ny: side, axis: "y" });
+        }
       }
+    const wide = Math.min(4, Math.max(2.2, Math.min(sx, sy) * 0.3));
+    const free = (q: Spot, upTo: number) => {
+      // The post's footprint: a little under the part's edge, and POST_WALL outside it.
+      const cx = q.x + q.nx * (out - LEDGE) * 0.5;
+      const cy = q.y + q.ny * (out - LEDGE) * 0.5;
+      const hx = Math.abs(q.nx) * (out + LEDGE) * 0.5 + Math.abs(q.ny) * wide * 0.5 + 0.3;
+      const hy = Math.abs(q.ny) * (out + LEDGE) * 0.5 + Math.abs(q.nx) * wide * 0.5 + 0.3;
+      if (!inside(q.x + q.nx * out, q.y + q.ny * out, 0.5)) return false;
+      return !l.placements.some((o) => o.nodeId !== p.nodeId && o.layer !== "external" && o.pos[2] - o.size[2] / 2 < upTo && Math.abs(o.pos[0] - cx) < o.size[0] / 2 + hx && Math.abs(o.pos[1] - cy) < o.size[1] / 2 + hy);
+    };
+    // The centre spot on an edge is only a fallback for when both outer ones are blocked.
+    const taken = new Set<string>();
+    const chosen = spots.filter((q, i) => {
+      const key = `${q.nx},${q.ny}`;
+      if (!isRound && i >= 8 && taken.has(key)) return false;
+      if (!free(q, Math.min(top, cap))) return false;
+      taken.add(key);
+      return true;
+    });
+    // Clips go on one pair of opposite sides, so the board tilts in under one side and clicks past the other.
+    const clipAxis = isRound ? "r" : chosen.some((q) => q.axis === "x" && q.nx > 0) && chosen.some((q) => q.axis === "x" && q.nx < 0) ? "x" : "y";
+    for (const q of chosen) {
+      const clip = q.axis === clipAxis && top + CLIP_RISE <= cap && free(q, top + CLIP_RISE);
+      const peak = clip ? top + CLIP_RISE : Math.min(top, cap);
+      // Profiles are drawn in the plane of the post (outward distance, height) and swept along the edge.
+      const sweep = (pts: [number, number][]) => {
+        const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([n, z]) => new THREE.Vector2(n, z))), { depth: wide, bevelEnabled: false });
+        g.translate(0, 0, -wide / 2);
+        g.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(q.nx, q.ny, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(q.ny, -q.nx, 0)).setPosition(q.x, q.y, 0));
+        return g;
+      };
+      if (bottom - floor > 0.05) feet.push(sweep([[-LEDGE, floor], [out, floor], [out, bottom], [-LEDGE, bottom]]));
+      if (peak - bottom > 1) {
+        const wall: [number, number][] = [[POST_FIT, Math.max(floor, bottom - 0.2)], [out, Math.max(floor, bottom - 0.2)], [out, peak], [POST_FIT, peak]];
+        // The clip: a small hook over the board's edge, flat underneath and sloped on top so the board slides past.
+        guides.push(sweep(clip ? [...wall, [POST_FIT - CLIP_REACH, top + 0.25], [POST_FIT, top + 0.25]] : wall));
+      }
+      held.add(p.nodeId);
     }
   }
   const merge = (list: THREE.BufferGeometry[]) => {
@@ -263,8 +305,8 @@ function buildShell(l: Layout, mat: THREE.Material) {
     b.updateMatrixWorld();
     return b;
   };
-  // Keep the inside corners tight enough that a board placed in a corner still clears them.
-  const innerR = round ? R - t : Math.max(0.6, Math.min(R - t, l.clearance * 3.4));
+  // The layout has already kept the corner radius small enough that parts clear the inside of it.
+  const innerR = round ? R - t : (l.innerRadius ?? Math.max(0.6, R - t));
   const rim = Math.max(0.8, t * 0.45);
   const backEdge = Math.min(round ? l.radius : 3, d / 5, R * 0.6);
   const cavityLine = outline(w - 2 * t, h - 2 * t, innerR, seg);
@@ -281,6 +323,19 @@ function buildShell(l: Layout, mat: THREE.Material) {
     const b = brush(g);
     body = ev.evaluate(body, b, ADDITION);
     extra.push(b);
+  }
+  if (l.stand) {
+    // A wedge under the body, so it leans back on a desk with its face towards you.
+    const zb = -d / 2 + backEdge + 0.5;
+    const zf = d / 2 - 1.5;
+    const drop = (zf - zb) * Math.tan(STAND_TILT);
+    const span = Math.max(10, w - 2 * R - 2);
+    const g = new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(zb, -h / 2 + 0.4), new THREE.Vector2(zf, -h / 2 + 0.4), new THREE.Vector2(zf, -h / 2 - drop), new THREE.Vector2(zb, -h / 2)]), { depth: span, bevelEnabled: false });
+    g.rotateY(-Math.PI / 2);
+    g.translate(span / 2, 0, 0);
+    const foot = brush(g);
+    body = ev.evaluate(body, foot, ADDITION);
+    extra.push(foot);
   }
   // A thumbnail notch in the rim at the bottom, to lift the panel out again.
   const notch = brush(prism(outline(7, rim + 2, 0.6, 3), d / 2 - 1.2, d / 2 + 1).translate(0, -h / 2 + (rim + 2) / 2 - 1, 0));
@@ -488,9 +543,9 @@ interface Movable {
   away: THREE.Vector3;
 }
 
-export function EnclosureViewer({ layout, color, face, wires, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; /** Connections to draw between parts, by node id. Shown in the x-ray and exploded views. */ wires?: { from: string; to: string; color: string }[]; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
+export function EnclosureViewer({ layout, color, face, wires, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; /** Connections to draw between parts, by node id. Shown in the x-ray and exploded views. */ wires?: { from: string; to: string; color: string; pins: { a: string; b: string }[] }[]; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
   const host = useRef<HTMLDivElement>(null);
-  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; wires: { mesh: THREE.Mesh; a: THREE.Object3D; b: THREE.Object3D; lift: THREE.Vector3; key: string }[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
+  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; wires: { mesh: THREE.Mesh; a: THREE.Object3D; b: THREE.Object3D; pa: THREE.Vector3; pb: THREE.Vector3; rise: number; key: string }[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
     exportStl: () => {
@@ -606,9 +661,13 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
         const key = `${wire.a.position.z.toFixed(2)}|${wire.b.position.z.toFixed(2)}`;
         if (!wire.mesh.visible || key === wire.key) continue;
         wire.key = key;
-        const mid = wire.a.position.clone().add(wire.b.position).multiplyScalar(0.5).add(wire.lift);
+        // From one solder pad up off the board, across, and down onto the other pad.
+        const from = wire.pa.clone().applyEuler(wire.a.rotation).add(wire.a.position);
+        const to = wire.pb.clone().applyEuler(wire.b.rotation).add(wire.b.position);
+        const up = new THREE.Vector3(0, 0, wire.rise);
+        const path = [from, from.clone().add(up), from.clone().add(to).multiplyScalar(0.5).add(up).add(new THREE.Vector3(0, 0, 1.5)), to.clone().add(up), to];
         wire.mesh.geometry.dispose();
-        wire.mesh.geometry = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(wire.a.position, mid, wire.b.position), 20, 0.45, 6);
+        wire.mesh.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path, false, "catmullrom", 0.4), 28, 0.32, 6);
       }
       s.controls.target.z += ((exploded ? s.span / 2 : 0) - s.controls.target.z) * 0.12;
       controls.update();
@@ -627,7 +686,7 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
   }, [interactive, spin]);
 
   // Rebuild the model whenever the design changes.
-  const sig = JSON.stringify([layout.shape, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face, wires]);
+  const sig = JSON.stringify([layout.shape, layout.stand, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face, wires]);
   useEffect(() => {
     const s = stage.current;
     if (!s) return;
@@ -654,8 +713,12 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
     }
     const step = Math.min(d * 0.4 + 10, 22);
     const movers: Movable[] = [];
+    // Everything that is the device hangs off one group, so a stand can lean the whole thing back.
+    const rig = new THREE.Group();
+    if (layout.stand) rig.rotation.x = -STAND_TILT;
+    model.add(rig);
     const add = (obj: THREE.Object3D, offsetZ: number) => {
-      model.add(obj);
+      rig.add(obj);
       movers.push({ obj, home: obj.position.clone(), away: obj.position.clone().add(new THREE.Vector3(0, 0, offsetZ)) });
       if (s.mode === "exploded") obj.position.z += offsetZ;
     };
@@ -686,14 +749,33 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
       add(part, step * order[p.layer]);
       byNode.set(p.nodeId, part);
     }
-    // One soft tube per connection, bowed forward and fanned out so parallel wires stay apart.
-    s.wires = (wires ?? []).flatMap((e, i) => {
+    // One wire per pin, from a solder pad on one part to a pad on the other.
+    const sizes = new Map(layout.placements.map((p) => [p.nodeId, p] as const));
+    const pad = (nodeId: string, pin: string) => {
+      const p = sizes.get(nodeId)!;
+      const pins = getBlock(p.blockId)?.pins ?? [];
+      const found = pins.findIndex((x) => x.name === pin);
+      const slots = Math.max(pins.length, 6);
+      const slot = found >= 0 ? found : [...pin].reduce((n, ch) => n + ch.charCodeAt(0), 0) % slots;
+      const at = new THREE.Vector3(-p.size[0] / 2 + ((slot + 0.5) / slots) * p.size[0], p.size[1] / 2 - 1.3, -p.size[2] / 2 + Math.min(1.6, p.size[2] * 0.5) + 0.15);
+      const dot = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 0.3), std("#d8b24a", 0.35, 0.8));
+      dot.position.copy(at);
+      byNode.get(nodeId)!.add(dot);
+      return at;
+    };
+    const HOT = /^(3V3|5V|VCC|VIN|BAT\+|OUT\+|IN\+|VBUS)$/i;
+    const GROUND = /^(GND|BAT-|OUT-|IN-)$/i;
+    let count = 0;
+    s.wires = (wires ?? []).flatMap((e) => {
       const a = byNode.get(e.from);
       const b = byNode.get(e.to);
       if (!a || !b) return [];
-      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), std(e.color, 0.5));
-      model.add(mesh);
-      return [{ mesh, a, b, lift: new THREE.Vector3(((i % 3) - 1) * 2.5, ((i % 2) - 0.5) * 3, 4 + (i % 4)), key: "" }];
+      return e.pins.map((x) => {
+        const tint = GROUND.test(x.a) || GROUND.test(x.b) ? "#26282b" : HOT.test(x.a) || HOT.test(x.b) ? "#d9534f" : e.color;
+        const mesh = new THREE.Mesh(new THREE.BufferGeometry(), std(tint, 0.5));
+        rig.add(mesh);
+        return { mesh, a, b, pa: pad(e.from, x.a), pb: pad(e.to, x.b), rise: 2.5 + (count++ % 4) * 0.8, key: "" };
+      });
     });
 
     // Two cards in the pocket, so it reads as a wallet. They are props, not part of the print.
@@ -708,7 +790,7 @@ export function EnclosureViewer({ layout, color, face, wires, mode = "solid", sp
       add(cards, step * 6.4);
     }
 
-    const low = Math.min(-h / 2, ...layout.placements.map((p) => p.pos[1] - p.size[1] / 2));
+    const low = layout.stand ? -(h / 2) * Math.cos(STAND_TILT) - (d / 2) * Math.sin(STAND_TILT) : Math.min(-h / 2, ...layout.placements.map((p) => p.pos[1] - p.size[1] / 2));
     const shadow = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(w, d) * 2.4, Math.max(w, d) * 2.4), new THREE.MeshBasicMaterial({ map: contactShadow(), transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = low - 0.5;

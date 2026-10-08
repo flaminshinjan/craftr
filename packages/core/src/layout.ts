@@ -207,7 +207,10 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     for (const k of live) {
       const L = packed[k];
       const xo = L.hasPort ? halfW - clearance - L.w / 2 : 0;
-      placedLayers[k] = L.items.map((it) => ({ ...it, x: it.x + xo, y: it.y + (k === "front" ? frontDrop : 0) }));
+      // On a card the front parts live in a strip along the bottom, so everything else slides to the top
+      // to leave that strip clear: the status light then sits beside the battery, not on it.
+      const up = card && packed.front.items.length && k !== "front" ? Math.max(0, (roomH - L.h) / 2) : 0;
+      placedLayers[k] = L.items.map((it) => ({ ...it, x: it.x + xo, y: it.y + (k === "front" ? frontDrop : up) }));
     }
   }
 
@@ -270,7 +273,30 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   const massG = Math.round(shellVolumeCm3 * density * 0.85 + parts.reduce((s, p) => s + p.block.massG, 0));
   const limit = Math.min(outer.w, outer.h, outer.d) / 2 - 0.5;
 
-  return { shape, card, pocket, outer, minOuter, wall, radius: Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : design.style === "minimal" ? Math.min(14, Math.max(style.radius, Math.min(outer.w, outer.h) * 0.2)) : style.radius, limit), clearance, placements, cutouts, fits, shellVolumeCm3, massG };
+  const stand = !!design.stand && shape === "box" && !card && !parts.some((x) => x.block.mount === "bottom_external");
+  // Corners as round as the style wants, but never so round that the inside of a corner cuts into a part.
+  let radius = Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : design.style === "minimal" ? Math.min(14, Math.max(style.radius, Math.min(outer.w, outer.h) * 0.2)) : style.radius, limit);
+  let innerRadius = Math.max(0.6, radius - wall);
+  if (shape === "box") {
+    const round = new Set(parts.filter((x) => x.block.round).map((x) => x.node.id));
+    const clears = (ri: number) => {
+      const cx = outer.w / 2 - wall - ri;
+      const cy = outer.h / 2 - wall - ri;
+      return placements.every((p) => {
+        if (p.layer === "external") return true;
+        // A disc reaches a corner only along its diagonal.
+        const reach = round.has(p.nodeId) ? Math.SQRT1_2 : 1;
+        const dx = Math.abs(p.pos[0]) + (p.size[0] / 2) * reach - cx;
+        const dy = Math.abs(p.pos[1]) + (p.size[1] / 2) * reach - cy;
+        return dx <= 0 || dy <= 0 || Math.hypot(dx, dy) <= ri - 0.3;
+      });
+    };
+    innerRadius = Math.round(innerRadius * 2) / 2;
+    while (innerRadius > 1 && !clears(innerRadius)) innerRadius -= 0.5;
+    // The outside may be rounder than the inside, as long as the wall stays at least 1 mm thick across the corner.
+    radius = Math.round(Math.min(radius, innerRadius + (Math.SQRT2 * wall - 1.1) / (Math.SQRT2 - 1)) * 2) / 2;
+  }
+  return { shape, card, stand, pocket, outer, minOuter, wall, radius, innerRadius, clearance, placements, cutouts, fits, shellVolumeCm3, massG };
 }
 
 export function enclosureCostInr(l: Layout, material: Material): number {

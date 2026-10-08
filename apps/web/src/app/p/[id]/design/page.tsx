@@ -113,6 +113,12 @@ function Design({ p }: { p: Project }) {
                 );
               })}
             </div>
+            {(design.shape ?? "box") === "box" && (
+              <label className="mt-3 flex items-center justify-between gap-3 text-[14px] text-ink-2">
+                Lean back on a stand
+                <input type="checkbox" checked={!!design.stand} onChange={(e) => set({ stand: e.target.checked })} className="size-5 accent-[#1b1b1a]" />
+              </label>
+            )}
             {design.shape === "card" && (
               <label className="mt-3 flex items-center justify-between gap-3 text-[14px] text-ink-2">
                 Card pocket

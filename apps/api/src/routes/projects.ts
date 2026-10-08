@@ -132,6 +132,7 @@ function patchDesign(cur: DesignConfig, patch: Partial<Record<keyof DesignConfig
     if (/^#[0-9a-fA-F]{6}$/.test(face) && face.toLowerCase() !== d.color.toLowerCase()) d.face = face;
     else delete d.face;
   }
+  if (typeof patch.stand === "boolean") d.stand = patch.stand;
   if (typeof patch.auto === "boolean") d.auto = patch.auto;
   for (const k of ["width", "height", "depth"] as const) {
     const v = Number(patch[k]);

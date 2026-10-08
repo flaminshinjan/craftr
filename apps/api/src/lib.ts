@@ -39,7 +39,7 @@ export function fromDesign(d: ProductDesign) {
   ids = ensurePower(ids);
   const nodes = nodesFromBlocks([...new Set(ids.filter((id) => BLOCK_MAP[id].iface === "mcu")), ...ids.filter((id) => BLOCK_MAP[id].iface !== "mcu")]);
   const spec: ProductSpec = { ...DEFAULT_SPEC, ...d.spec };
-  const design: DesignConfig = { ...DEFAULT_DESIGN, shape: d.enclosure.shape, pocketCards: d.enclosure.shape === "card" ? Math.max(0, Math.min(3, Math.round(d.enclosure.pocket_cards))) : 0, style: d.enclosure.style, material: d.enclosure.material, color: HEX.test(d.enclosure.color) ? d.enclosure.color : COLORS[0], ...(HEX.test(d.enclosure.face_color) && d.enclosure.face_color !== d.enclosure.color ? { face: d.enclosure.face_color } : {}) };
+  const design: DesignConfig = { ...DEFAULT_DESIGN, shape: d.enclosure.shape, pocketCards: d.enclosure.shape === "card" ? Math.max(0, Math.min(3, Math.round(d.enclosure.pocket_cards))) : 0, style: d.enclosure.style, material: d.enclosure.material, color: HEX.test(d.enclosure.color) ? d.enclosure.color : COLORS[0], ...(HEX.test(d.enclosure.face_color) && d.enclosure.face_color !== d.enclosure.color ? { face: d.enclosure.face_color } : {}), ...(d.enclosure.stand && d.enclosure.shape === "box" ? { stand: true } : {}) };
   return { nodes, spec, features: d.features.length ? d.features.slice(0, 5) : deriveFeatures(nodes), ...build(nodes, design, spec) };
 }
 
@@ -50,7 +50,7 @@ export function ensurePower(ids: string[]): string[] {
     // The charging pad has its own magnets, runs from the power bank module and needs a cell worth charging from.
     out = out.filter((id) => id !== "magsafe_ring" && id !== "charger_tp4056");
     if (!tags("boost_5v")) out.push("powerbank_module");
-    if (!tags("battery")) out.push("lipo_3000");
+    if (!tags("battery")) out.push("lipo_5000");
   }
   if (tags("battery") && !tags("charger") && !tags("onboard_charger")) out.push("charger_tp4056");
   return out;
