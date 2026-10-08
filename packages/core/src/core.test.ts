@@ -38,7 +38,9 @@ for (const t of TEMPLATES) {
     }
     // No two parts in the same layer overlap.
     const inside = c.layout.placements.filter((p) => p.layer !== "external");
-    for (const a of inside) for (const b of inside) if (a !== b && a.layer === b.layer) assert.ok(Math.abs(a.pos[0] - b.pos[0]) >= (a.size[0] + b.size[0]) / 2 - 1e-6 || Math.abs(a.pos[1] - b.pos[1]) >= (a.size[1] + b.size[1]) / 2 - 1e-6, `${a.blockId} overlaps ${b.blockId}`);
+    // A small part may sit in the hole of a ring, such as a button inside a ring of lights.
+    const inHole = (ring: (typeof inside)[number], x: (typeof inside)[number]) => Math.hypot(x.size[0], x.size[1]) <= (getBlock(ring.blockId)!.hole ?? 0) - 1 && Math.hypot(ring.pos[0] - x.pos[0], ring.pos[1] - x.pos[1]) < 0.5;
+    for (const a of inside) for (const b of inside) if (a !== b && a.layer === b.layer && !inHole(a, b) && !inHole(b, a)) assert.ok(Math.abs(a.pos[0] - b.pos[0]) >= (a.size[0] + b.size[0]) / 2 - 1e-6 || Math.abs(a.pos[1] - b.pos[1]) >= (a.size[1] + b.size[1]) / 2 - 1e-6, `${a.blockId} overlaps ${b.blockId}`);
     if (t.design.shape === "card") {
       assert.ok(c.layout.pocket, "card shape with pocketCards should get a pocket");
       // Nothing front-mounted may sit under the pocket.

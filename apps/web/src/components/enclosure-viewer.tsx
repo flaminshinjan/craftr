@@ -4,6 +4,7 @@ import { getBlock, type Layout, type PlacedCutout } from "@craftr/core";
 import { useEffect, useImperativeHandle, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries, toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -462,7 +463,27 @@ function partObject(blockId: string, size: [number, number, number], reach: numb
   };
   const top = sz / 2;
   const board = Math.min(1.6, sz * 0.5);
-  const pcb = () => box(sx, sy, board, std(PCB[b?.category ?? "other"] ?? PCB.other, 0.55), 0, 0, -top + board / 2, 0.6);
+  const pcb = () => {
+    box(sx, sy, board, std(PCB[b?.category ?? "other"] ?? PCB.other, 0.42, 0.1), 0, 0, -top + board / 2, 0.6);
+    // Plated header holes at 2.54 mm pitch: both long edges on a controller, one on a breakout.
+    const gold = std("#d4af55", 0.3, 0.9);
+    const alongX = sx >= sy;
+    const len = Math.max(sx, sy);
+    const n = Math.max(2, Math.floor((len - 3) / 2.54));
+    const rows = b?.iface === "mcu" ? [-1, 1] : [1];
+    const holes: THREE.BufferGeometry[] = [];
+    for (const side of rows) {
+      for (let i = 0; i < n; i++) {
+        const u = -((n - 1) * 2.54) / 2 + i * 2.54;
+        const v = side * (Math.min(sx, sy) / 2 - 1.3);
+        const ringGeo = new THREE.RingGeometry(0.35, 0.8, 12);
+        ringGeo.translate(alongX ? u : v, alongX ? v : u, -top + board + 0.02);
+        holes.push(ringGeo);
+      }
+    }
+    g.add(new THREE.Mesh(mergeGeometries(holes)!, gold));
+    holes.forEach((x) => x.dispose());
+  };
   const metal = std("#c9cdd2", 0.3, 0.85);
   const dark = std("#191b1e", 0.5);
   const cap = std(lightShell ? "#3a3c40" : "#e9e3d6", 0.55);
@@ -505,7 +526,7 @@ function partObject(blockId: string, size: [number, number, number], reach: numb
     const c = b.cutout!;
     box(c.w + 2, c.h + 2, sz - board, dark, 0, 0, -top + board + (sz - board) / 2, 0.5);
     // The glass sits in the window, a hair below the outside face.
-    box(c.w - 0.4, c.h - 0.4, reach - 0.2, std("#0b0d10", 0.08, 0.4), 0, 0, top + (reach - 0.2) / 2, 0.3);
+    box(c.w - 0.4, c.h - 0.4, reach - 0.2, new THREE.MeshPhysicalMaterial({ color: "#07090c", roughness: 0.06, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.04, reflectivity: 0.6 }), 0, 0, top + (reach - 0.2) / 2, 0.3);
   } else if (id === "soil_moisture") {
     // A flat blade with a pointed tip, the way a capacitive soil probe is cut.
     const s = new THREE.Shape();
@@ -554,7 +575,7 @@ interface Movable {
 
 export function EnclosureViewer({ layout, color, face, finish = "chalk", wires, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; finish?: "chalk" | "smooth"; /** Connections to draw between parts, by node id. Shown in the x-ray and exploded views. */ wires?: { from: string; to: string; color: string; pins: { a: string; b: string }[] }[]; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
   const host = useRef<HTMLDivElement>(null);
-  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; wires: { mesh: THREE.Mesh; a: THREE.Object3D; b: THREE.Object3D; pa: THREE.Vector3; pb: THREE.Vector3; rise: number; key: string }[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
+  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; key: THREE.DirectionalLight; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; wires: { mesh: THREE.Mesh; a: THREE.Object3D; b: THREE.Object3D; pa: THREE.Vector3; pb: THREE.Vector3; rise: number; key: string }[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
     exportStl: () => {
@@ -610,17 +631,32 @@ export function EnclosureViewer({ layout, color, face, finish = "chalk", wires, 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(32, 1, 1, 5000);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xe8dccb, 1.5));
-    const key = new THREE.DirectionalLight(0xffffff, 2.2);
-    key.position.set(120, 220, 260);
+    // A soft studio: the room lights every surface and gives metal and glass something to reflect,
+    // and one key light from the upper front casts the shadow that sits the object on the ground.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const room = new RoomEnvironment();
+    scene.environment = pmrem.fromScene(room, 0.04).texture;
+    scene.environmentIntensity = 0.3;
+    room.dispose();
+    pmrem.dispose();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xe8dccb, 0.55));
+    const key = new THREE.DirectionalLight(0xfff6ea, 2.1);
+    key.position.set(140, 260, 240);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.radius = 7;
+    key.shadow.bias = -0.0008;
+    key.shadow.normalBias = 0.6;
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0xfff1dc, 0.7);
+    const fill = new THREE.DirectionalLight(0xfff1dc, 0.35);
     fill.position.set(-200, 60, -120);
     scene.add(fill);
     const model = new THREE.Group();
@@ -632,7 +668,7 @@ export function EnclosureViewer({ layout, color, face, finish = "chalk", wires, 
     controls.enabled = interactive;
     controls.autoRotate = spin && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     controls.autoRotateSpeed = 1.2;
-    stage.current = { renderer, scene, camera, controls, model, movers: [], shells: [], wires: [], geos: null, mode: "solid", dist: 200, span: 0 };
+    stage.current = { renderer, scene, camera, controls, key, model, movers: [], shells: [], wires: [], geos: null, mode: "solid", dist: 200, span: 0 };
 
     const size = () => {
       const { clientWidth: w, clientHeight: h } = el;
@@ -841,6 +877,25 @@ export function EnclosureViewer({ layout, color, face, finish = "chalk", wires, 
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = low - 0.5;
     model.add(shadow);
+    // The cast shadow lands on an invisible floor; the soft blob under it keeps the contact dark.
+    const floorSize = Math.max(w, h, d) * 6;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), new THREE.ShadowMaterial({ opacity: 0.2 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = low - 0.4;
+    ground.receiveShadow = true;
+    model.add(ground);
+    rig.traverse((o) => {
+      if (!(o as THREE.Mesh).isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+    const reachOut = Math.max(w, h, d) * 2.2;
+    const cam = s.key.shadow.camera;
+    cam.left = cam.bottom = -reachOut;
+    cam.right = cam.top = reachOut;
+    cam.near = 1;
+    cam.far = 1500;
+    cam.updateProjectionMatrix();
 
     s.span = step * 5;
     s.movers = movers;

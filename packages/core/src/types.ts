@@ -53,6 +53,8 @@ export interface BlockDef {
   mount: Mount;
   /** Opening the enclosure needs on the face this block is mounted to. */
   cutout?: Cutout;
+  /** For a ring: the diameter of the hole in its middle, where a small part such as a button may sit. */
+  hole?: number;
   /** True when the part is a disc or ring, so only its diameter (w) matters for fitting. */
   round?: boolean;
   /** A connector that has to reach the right-hand wall (USB). */

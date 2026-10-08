@@ -502,6 +502,7 @@ export const BLOCKS: BlockDef[] = [
     tags: ["rgb", "light", "neopixel", "glow"],
     size: { w: 32, d: 32, h: 3 },
     round: true,
+    hole: 20,
     mount: "front",
     iface: "gpio",
     signals: ["DIN"],

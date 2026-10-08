@@ -67,7 +67,9 @@ function pack(items: Item[], maxW?: number): Packed {
 }
 
 const inCircle = (p: Placed, r: number) => (p.block.round ? Math.hypot(p.x, p.y) + p.w / 2 <= r + 1e-6 : Math.hypot(Math.abs(p.x) + p.w / 2, Math.abs(p.y) + p.d / 2) <= r + 1e-6);
-const clash = (a: Placed, b: Placed) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + GAP - 1e-6 && Math.abs(a.y - b.y) < (a.d + b.d) / 2 + GAP - 1e-6;
+/** A small part sitting in the middle of a ring, such as a button inside a ring of lights. */
+const nested = (ring: Placed, in_: Placed) => !!ring.block.hole && Math.hypot(in_.w, in_.d) <= ring.block.hole - 1 && Math.hypot(ring.x - in_.x, ring.y - in_.y) < 0.5;
+const clash = (a: Placed, b: Placed) => !nested(a, b) && !nested(b, a) && Math.abs(a.x - b.x) < (a.w + b.w) / 2 + GAP - 1e-6 && Math.abs(a.y - b.y) < (a.d + b.d) / 2 + GAP - 1e-6;
 
 /**
  * Packs parts into a disc of radius r. Boards with a USB port go hard against the right-hand wall;
