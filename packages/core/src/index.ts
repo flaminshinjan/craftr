@@ -7,4 +7,5 @@ export * from "./firmware";
 export * from "./project";
 export * from "./orders";
 export * from "./package";
+export * from "./assembly";
 export * from "./billing";

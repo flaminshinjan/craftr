@@ -150,19 +150,14 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     groups.logic = [...groups.logic, ...groups.power];
     groups.power = [];
   };
-  const depthOf = () => {
-    const live = ORDER.filter((k) => groups[k].length);
-    return Math.max(6, live.reduce((s, k) => s + thick(k), 0) + LAYER_GAP * Math.max(0, live.length - 1));
-  };
-
   if (shape === "round") {
     const radii = () => ORDER.map((k) => minRadius(groups[k]));
     if (groups.power.length && groups.logic.length && minRadius([...groups.logic, ...groups.power]) <= Math.max(...radii())) mergeInternal();
     const r = Math.max(8, ...radii());
     const dia = ceil(2 * r + pad);
-    minOuter = { w: dia, h: dia, d: ceil(depthOf() + pad) };
+    minOuter = { w: dia, h: dia, d: 0 };
     outer = design.auto ? { ...minOuter } : { w: design.width, h: design.width, d: design.depth };
-    fits = outer.w >= minOuter.w && outer.d >= minOuter.d;
+    fits = outer.w >= minOuter.w;
     const room = outer.w / 2 - wall - clearance;
     for (const k of ORDER) if (groups[k].length) placedLayers[k] = packCircle(groups[k], room) ?? packCircle(groups[k], minRadius(groups[k]))!;
   } else {
@@ -198,10 +193,10 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
     const live = ORDER.filter((k) => groups[k].length);
     const innerW = Math.max(16, ...live.map((k) => packed[k].w));
     const innerH = Math.max(16, ...live.map((k) => packed[k].h));
-    minOuter = { w: Math.max(ceil(innerW + pad), card ? CARD.w : 0), h: Math.max(ceil(innerH + pad), card ? CARD.h : 0), d: ceil(depthOf() + pad) };
+    minOuter = { w: Math.max(ceil(innerW + pad), card ? CARD.w : 0), h: Math.max(ceil(innerH + pad), card ? CARD.h : 0), d: 0 };
     // A card keeps its footprint and is always as thin as the parts allow.
     outer = design.auto || card ? { ...minOuter } : { w: design.width, h: design.height, d: design.depth };
-    fits = outer.w >= minOuter.w && outer.h >= minOuter.h && outer.d >= minOuter.d;
+    fits = outer.w >= minOuter.w && outer.h >= minOuter.h;
     const halfW = outer.w / 2 - wall;
     // The card pocket covers the top of the front face, so anything front-mounted moves to a strip along the bottom.
     const cards = card ? Math.max(0, Math.min(3, Math.round(design.pocketCards ?? 0))) : 0;
@@ -214,6 +209,26 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
       const xo = L.hasPort ? halfW - clearance - L.w / 2 : 0;
       placedLayers[k] = L.items.map((it) => ({ ...it, x: it.x + xo, y: it.y + (k === "front" ? frontDrop : 0) }));
     }
+  }
+
+  // Depth: layers stack from the rear wall, but a front part only adds depth where it sits over something.
+  // A status light beside the battery shares the battery's depth instead of adding a whole layer.
+  {
+    let top = 0;
+    const solids: { it: Placed; top: number }[] = [];
+    for (const k of ORDER) {
+      const items = placedLayers[k];
+      if (!items || k === "front") continue;
+      const t = thick(k);
+      for (const it of items) solids.push({ it, top: k === "back" ? it.t : top + t / 2 + it.t / 2 });
+      top += t + LAYER_GAP;
+    }
+    const over = (a: Placed, b: Placed) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 1 && Math.abs(a.y - b.y) < (a.d + b.d) / 2 + 1;
+    const front = (placedLayers.front ?? []).map((f) => f.t + Math.max(0, ...solids.filter((s) => over(f, s.it)).map((s) => s.top + LAYER_GAP)));
+    const need = ceil(Math.max(6, top - LAYER_GAP, ...front) + pad);
+    minOuter.d = need;
+    if (design.auto || card) outer.d = need;
+    fits = fits && outer.d >= need;
   }
 
   const cavityD = outer.d - 2 * wall;
@@ -255,7 +270,7 @@ export function layout(nodes: ProjectNode[], design: DesignConfig): Layout {
   const massG = Math.round(shellVolumeCm3 * density * 0.85 + parts.reduce((s, p) => s + p.block.massG, 0));
   const limit = Math.min(outer.w, outer.h, outer.d) / 2 - 0.5;
 
-  return { shape, card, pocket, outer, minOuter, wall, radius: Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : style.radius, limit), clearance, placements, cutouts, fits, shellVolumeCm3, massG };
+  return { shape, card, pocket, outer, minOuter, wall, radius: Math.min(shape === "round" ? Math.min(style.radius, 4) : card ? 9 : design.style === "minimal" ? Math.min(14, Math.max(style.radius, Math.min(outer.w, outer.h) * 0.2)) : style.radius, limit), clearance, placements, cutouts, fits, shellVolumeCm3, massG };
 }
 
 export function enclosureCostInr(l: Layout, material: Material): number {

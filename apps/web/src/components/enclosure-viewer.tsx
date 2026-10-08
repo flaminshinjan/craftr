@@ -182,6 +182,69 @@ function logoBrush(spot: Box2, z: number, depth: number, mat: THREE.Material) {
   return b;
 }
 
+const POST_FIT = 0.15;
+const POST_WALL = 0.8;
+
+/**
+ * The printed features that hold parts: corner posts that locate and support each board in the body,
+ * and low frames on the inside of the front panel for the parts that mount to it.
+ * Posts are left out wherever they would run through another part.
+ */
+function fixtures(l: Layout) {
+  const { w, h, d } = l.outer;
+  const t = l.wall;
+  const round = l.shape === "round";
+  const floor = -d / 2 + t;
+  const cap = d / 2 - t - LIP_DEPTH - 0.4;
+  const inside = (x: number, y: number, slack: number) => (round ? Math.hypot(x, y) <= w / 2 - t + slack : Math.abs(x) <= w / 2 - t + slack && Math.abs(y) <= h / 2 - t + slack);
+  const feet: THREE.BufferGeometry[] = [];
+  const guides: THREE.BufferGeometry[] = [];
+  const frames: THREE.BufferGeometry[] = [];
+  const held = new Set<string>();
+  const out = POST_FIT + POST_WALL;
+
+  for (const p of l.placements) {
+    const [sx, sy, sz] = p.size;
+    const [px, py, pz] = p.pos;
+    if (p.layer === "front") {
+      // A shallow frame the part drops into, glued or held by its own leads.
+      const fw = sx + 2 * 0.2;
+      const fh = sy + 2 * 0.2;
+      const reach = 0.2 + 0.7;
+      if (!inside(px + Math.sign(px || 1) * (sx / 2 + reach), py + Math.sign(py || 1) * (sy / 2 + reach), -0.25)) continue;
+      const g = prism(outline(fw + 1.4, fh + 1.4, 0.6, 3), d / 2 - t - Math.min(1.6, sz), d / 2 - t + 0.2, outline(fw, fh, 0.2, 3).reverse());
+      g.translate(px, py, 0);
+      frames.push(g);
+      held.add(p.nodeId);
+      continue;
+    }
+    if (p.layer === "external" || getBlock(p.blockId)?.round || Math.min(sx, sy) < 8) continue;
+    const bottom = pz - sz / 2;
+    const top = Math.min(pz + sz / 2, cap);
+    for (const cx of [-1, 1]) {
+      for (const cy of [-1, 1]) {
+        const x = px + (cx * sx) / 2;
+        const y = py + (cy * sy) / 2;
+        if (!inside(x + cx * out, y + cy * out, 0.5)) continue;
+        // The column runs from the floor to the top of the board; it must not pass through anything else.
+        const blocked = l.placements.some((o) => o.nodeId !== p.nodeId && o.layer !== "external" && o.pos[2] - o.size[2] / 2 < top && Math.abs(o.pos[0] - (x - cx * 0.5)) < o.size[0] / 2 + 2.6 && Math.abs(o.pos[1] - (y - cy * 0.5)) < o.size[1] / 2 + 2.6);
+        if (blocked) continue;
+        const at = (u: number, v: number) => new THREE.Vector2(x + cx * u, y + cy * v);
+        if (bottom - floor > 0.05) feet.push(prism([at(-2, -2), at(out, -2), at(out, out), at(-2, out)], floor, Math.min(bottom, cap)));
+        if (top - bottom > 1) guides.push(prism([at(POST_FIT, -4), at(out, -4), at(out, out), at(-4, out), at(-4, POST_FIT), at(POST_FIT, POST_FIT)], Math.max(floor, bottom - 0.2), top));
+        held.add(p.nodeId);
+      }
+    }
+  }
+  const merge = (list: THREE.BufferGeometry[]) => {
+    if (!list.length) return null;
+    const g = mergeGeometries(list)!;
+    list.forEach((x) => x.dispose());
+    return g;
+  };
+  return { feet: merge(feet), guides: merge(guides), frames: merge(frames), held };
+}
+
 /**
  * Builds the printable shell from the compiled layout. The body is a tub: back and side walls in one piece.
  * The front is a flat panel that drops into a rebate in the rim, so the only seam is a fine line on the face,
@@ -211,6 +274,18 @@ function buildShell(l: Layout, mat: THREE.Material) {
   const cavity = brush(prism(cavityLine, -d / 2 + t, d / 2 + 1));
   const seat = brush(prism(seatLine, d / 2 - t, d / 2 + 1));
   let body = ev.evaluate(ev.evaluate(outer, cavity, SUBTRACTION), seat, SUBTRACTION);
+  const fx = fixtures(l);
+  const extra: Brush[] = [];
+  for (const g of [fx.feet, fx.guides]) {
+    if (!g) continue;
+    const b = brush(g);
+    body = ev.evaluate(body, b, ADDITION);
+    extra.push(b);
+  }
+  // A thumbnail notch in the rim at the bottom, to lift the panel out again.
+  const notch = brush(prism(outline(7, rim + 2, 0.6, 3), d / 2 - 1.2, d / 2 + 1).translate(0, -h / 2 + (rim + 2) / 2 - 1, 0));
+  body = ev.evaluate(body, notch, SUBTRACTION);
+  extra.push(notch);
   const cuts = l.cutouts.map((c) => cutoutBrush(c, l, mat));
   for (const c of cuts) body = ev.evaluate(body, c, SUBTRACTION);
 
@@ -219,11 +294,35 @@ function buildShell(l: Layout, mat: THREE.Material) {
   // A friction-fit lip so the panel seats in the body.
   const lw = w - 2 * t - 2 * LIP_FIT;
   const lh = h - 2 * t - 2 * LIP_FIT;
-  const extra: Brush[] = [];
   if (lw > 8 && lh > 8 && d - 2 * t > LIP_DEPTH + 1) {
     const lip = brush(prism(outline(lw, lh, innerR - LIP_FIT, seg), d / 2 - t - LIP_DEPTH, d / 2 - t + 0.2, outline(lw - 2 * LIP_THICK, lh - 2 * LIP_THICK, Math.max(0.3, innerR - LIP_FIT - LIP_THICK), seg).reverse()));
     extra.push(lip);
     lid = ev.evaluate(lid, lip, ADDITION);
+    // Crush ribs: thin ridges that stand 0.1 mm proud of the opening and squash on the first fit,
+    // so the panel grips whether the printer runs a little tight or a little loose.
+    const ribs: THREE.BufferGeometry[] = [];
+    const rib = (x: number, y: number, turn: number) => {
+      const g = new THREE.BoxGeometry(1, 0.5, LIP_DEPTH - 0.6);
+      g.rotateZ(turn);
+      g.translate(x, y, d / 2 - t - LIP_DEPTH / 2);
+      ribs.push(g);
+    };
+    if (round) for (let i = 0; i < 6; i++) rib(Math.sin((i * Math.PI) / 3) * (lw / 2 + 0.05), -Math.cos((i * Math.PI) / 3) * (lw / 2 + 0.05), (i * Math.PI) / 3);
+    else {
+      const ax = Math.max(0, Math.min(lw * 0.25, lw / 2 - innerR - 1.5));
+      const ay = Math.max(0, Math.min(lh * 0.25, lh / 2 - innerR - 1.5));
+      for (const k of ax ? [-1, 1] : [0]) for (const side of [-1, 1]) rib(k * ax, side * (lh / 2 + 0.05), 0);
+      for (const k of ay ? [-1, 1] : [0]) for (const side of [-1, 1]) rib(side * (lw / 2 + 0.05), k * ay, Math.PI / 2);
+    }
+    const ridge = brush(mergeGeometries(ribs)!);
+    ribs.forEach((g) => g.dispose());
+    lid = ev.evaluate(lid, ridge, ADDITION);
+    extra.push(ridge);
+  }
+  if (fx.frames) {
+    const b = brush(fx.frames);
+    lid = ev.evaluate(lid, b, ADDITION);
+    extra.push(b);
   }
   for (const c of cuts) lid = ev.evaluate(lid, c, SUBTRACTION);
   // The card pocket: a shallow sleeve on the outside of the front panel, open at the top, with a thumb notch.
@@ -389,9 +488,9 @@ interface Movable {
   away: THREE.Vector3;
 }
 
-export function EnclosureViewer({ layout, color, face, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
+export function EnclosureViewer({ layout, color, face, wires, mode = "solid", spin = false, interactive = true, className, ref }: { layout: Layout; color: string; face?: string; /** Connections to draw between parts, by node id. Shown in the x-ray and exploded views. */ wires?: { from: string; to: string; color: string }[]; mode?: ViewMode; spin?: boolean; interactive?: boolean; className?: string; ref?: React.Ref<ViewerHandle> }) {
   const host = useRef<HTMLDivElement>(null);
-  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
+  const stage = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; model: THREE.Group; movers: Movable[]; shells: THREE.MeshStandardMaterial[]; wires: { mesh: THREE.Mesh; a: THREE.Object3D; b: THREE.Object3D; lift: THREE.Vector3; key: string }[]; geos: { body: THREE.BufferGeometry; lid: THREE.BufferGeometry } | null; mode: ViewMode; dist: number; span: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
     exportStl: () => {
@@ -416,6 +515,7 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
       // Assembled, opaque, from a fixed front three-quarter angle, so every picture is framed the same way.
       s.movers.forEach((m) => m.obj.position.copy(m.home));
       s.shells.forEach((m) => (m.opacity = 1));
+      s.wires.forEach((x) => (x.mesh.visible = false));
       scene.background = new THREE.Color("#ece7df");
       renderer.setPixelRatio(1);
       renderer.setSize(size, size, false);
@@ -468,7 +568,7 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
     controls.enabled = interactive;
     controls.autoRotate = spin && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     controls.autoRotateSpeed = 1.2;
-    stage.current = { renderer, scene, camera, controls, model, movers: [], shells: [], geos: null, mode: "solid", dist: 200, span: 0 };
+    stage.current = { renderer, scene, camera, controls, model, movers: [], shells: [], wires: [], geos: null, mode: "solid", dist: 200, span: 0 };
 
     const size = () => {
       const { clientWidth: w, clientHeight: h } = el;
@@ -500,6 +600,16 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
           m.needsUpdate = true;
         }
       }
+      // Wires follow their parts, and are redrawn only while something is moving.
+      for (const wire of s.wires) {
+        wire.mesh.visible = s.mode !== "solid";
+        const key = `${wire.a.position.z.toFixed(2)}|${wire.b.position.z.toFixed(2)}`;
+        if (!wire.mesh.visible || key === wire.key) continue;
+        wire.key = key;
+        const mid = wire.a.position.clone().add(wire.b.position).multiplyScalar(0.5).add(wire.lift);
+        wire.mesh.geometry.dispose();
+        wire.mesh.geometry = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(wire.a.position, mid, wire.b.position), 20, 0.45, 6);
+      }
       s.controls.target.z += ((exploded ? s.span / 2 : 0) - s.controls.target.z) * 0.12;
       controls.update();
       renderer.render(scene, camera);
@@ -517,7 +627,7 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
   }, [interactive, spin]);
 
   // Rebuild the model whenever the design changes.
-  const sig = JSON.stringify([layout.shape, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face]);
+  const sig = JSON.stringify([layout.shape, layout.pocket, layout.outer, layout.wall, layout.radius, layout.cutouts, layout.placements, color, face, wires]);
   useEffect(() => {
     const s = stage.current;
     if (!s) return;
@@ -542,7 +652,7 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
       console.error("enclosure build failed", e);
       geos = { body: new RoundedBoxGeometry(w, h, d, 4, layout.radius), lid: new THREE.BufferGeometry(), marks: [] };
     }
-    const step = d * 0.4 + 10;
+    const step = Math.min(d * 0.4 + 10, 22);
     const movers: Movable[] = [];
     const add = (obj: THREE.Object3D, offsetZ: number) => {
       model.add(obj);
@@ -566,6 +676,7 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
     const order = { back: 1, power: 2, logic: 3, front: 4, external: 0 } as const;
     const c = new THREE.Color(face || color);
     const lightShell = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.25;
+    const byNode = new Map<string, THREE.Object3D>();
     for (const p of layout.placements) {
       // Distance from the part's outward face to the outside of the wall it looks through.
       const reach = p.layer === "front" ? d / 2 - FACE_RECESS - (p.pos[2] + p.size[2] / 2) : p.layer === "back" ? d / 2 + (p.pos[2] - p.size[2] / 2) : 0;
@@ -573,7 +684,17 @@ export function EnclosureViewer({ layout, color, face, mode = "solid", spin = fa
       part.position.set(...p.pos);
       if (p.layer === "back") part.rotation.y = Math.PI;
       add(part, step * order[p.layer]);
+      byNode.set(p.nodeId, part);
     }
+    // One soft tube per connection, bowed forward and fanned out so parallel wires stay apart.
+    s.wires = (wires ?? []).flatMap((e, i) => {
+      const a = byNode.get(e.from);
+      const b = byNode.get(e.to);
+      if (!a || !b) return [];
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), std(e.color, 0.5));
+      model.add(mesh);
+      return [{ mesh, a, b, lift: new THREE.Vector3(((i % 3) - 1) * 2.5, ((i % 2) - 0.5) * 3, 4 + (i % 4)), key: "" }];
+    });
 
     // Two cards in the pocket, so it reads as a wallet. They are props, not part of the print.
     if (layout.pocket) {

@@ -298,7 +298,7 @@ function PreviewCard({ p, generating }: { p: Project; generating: boolean }) {
           </>
         ) : tab === "model" ? (
           <>
-            <EnclosureViewer layout={p.compiled.layout} color={p.design.color} face={p.design.face} mode="xray" className="size-full" />
+            <EnclosureViewer layout={p.compiled.layout} color={p.design.color} face={p.design.face} wires={p.compiled.edges} mode="xray" className="size-full" />
             <span className="absolute bottom-3 left-3 rounded-full bg-card/90 px-3 py-1.5 text-[12.5px] text-ink-2">
               {p.compiled.layout.outer.w} × {p.compiled.layout.outer.h} × {p.compiled.layout.outer.d} mm · drag to rotate
             </span>

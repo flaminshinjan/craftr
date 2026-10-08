@@ -3,7 +3,7 @@
 import { AuthLink } from "@/components/auth-link";
 import { UserButton, useAuth } from "@clerk/nextjs";
 import clsx from "clsx";
-import { Box, ChevronDown, Coins, Cpu, Factory, Folder, Hammer, Menu, Package, Plus, ReceiptText, Settings, Shapes, ShieldCheck, X } from "lucide-react";
+import { Box, ChevronDown, Coins, Cpu, Factory, Folder, Hammer, Menu, Package, Plus, ReceiptText, Settings, Shapes, ShieldCheck, X, Wrench } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -64,7 +64,7 @@ export function Avatar() {
   return <UserButton appearance={{ elements: { avatarBox: { width: 40, height: 40 } } }} />;
 }
 
-export type NavKey = "build" | "components" | "design" | "firmware" | "bom" | "manufacturing" | "orders" | "projects" | "billing" | "settings" | "admin";
+export type NavKey = "build" | "components" | "design" | "firmware" | "bom" | "assembly" | "manufacturing" | "orders" | "projects" | "billing" | "settings" | "admin";
 
 /** The workspace frame: sidebar on the left, page on the right. Project links follow the open project, or the last one you opened. */
 export function Shell({ active, projectId, children, flush }: { active: NavKey; projectId?: string; children: React.ReactNode; flush?: boolean }) {
@@ -90,6 +90,7 @@ export function Shell({ active, projectId, children, flush }: { active: NavKey; 
     ["design", "Design", p("/design"), Shapes],
     ["firmware", "Firmware", p("/firmware"), Cpu],
     ["bom", "BOM & Cost", p("/bom"), ReceiptText],
+    ["assembly", "Assembly", p("/assembly"), Wrench],
     ["manufacturing", "Manufacturing", p("/manufacturing"), Factory],
   ];
   const bottom: [NavKey, string, string, typeof Box][] = [

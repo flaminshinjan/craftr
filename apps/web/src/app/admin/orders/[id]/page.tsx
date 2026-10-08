@@ -88,7 +88,7 @@ function Detail({ o, partners }: { o: AdminOrder; partners: Partner[] }) {
               <Segmented<ViewMode> value={mode} onChange={setMode} className="[&>button]:px-3 [&>button]:py-1.5" options={[{ value: "solid", label: "Enclosure" }, { value: "xray", label: "Inside" }, { value: "exploded", label: "Exploded" }]} />
             </div>
             <div className="relative mt-3 h-[380px] overflow-hidden rounded-2xl bg-sand/70">
-              <EnclosureViewer ref={viewer} layout={s.compiled.layout} color={s.design.color} face={s.design.face} mode={mode} className="absolute inset-0" />
+              <EnclosureViewer ref={viewer} layout={s.compiled.layout} color={s.design.color} face={s.design.face} wires={s.compiled.edges} mode={mode} className="absolute inset-0" />
               <span className="absolute bottom-3 left-3 rounded-full bg-card/90 px-3 py-1.5 text-[12.5px] text-ink-2">
                 {s.compiled.layout.outer.w} × {s.compiled.layout.outer.h} × {s.compiled.layout.outer.d} mm · {s.design.material} · {s.design.style} · {s.compiled.layout.wall} mm walls · ~{s.compiled.layout.massG} g
               </span>

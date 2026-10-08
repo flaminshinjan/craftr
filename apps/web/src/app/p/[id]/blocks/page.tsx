@@ -279,7 +279,7 @@ function Canvas({ p }: { p: Project }) {
             </div>
           ) : (
             <div className="absolute inset-0 bg-sand/60">
-              <EnclosureViewer layout={compiled.layout} color={p.design.color} face={p.design.face} mode="xray" className="size-full" />
+              <EnclosureViewer layout={compiled.layout} color={p.design.color} face={p.design.face} wires={compiled.edges} mode="xray" className="size-full" />
               <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-card/90 px-3 py-1.5 text-[12.5px] text-ink-2">
                 {compiled.layout.outer.w} × {compiled.layout.outer.h} × {compiled.layout.outer.d} mm
               </span>
